@@ -1,0 +1,14 @@
+{
+  "name": "gematria-apk",
+  "version": "1.0.0",
+  "description": "מחשבון גימטריא — אפליקציית אנדרואיד אופליין (Capacitor)",
+  "private": true,
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.1.2"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  }
+}

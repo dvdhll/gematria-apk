@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="median">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2e7cc">
+  <title>מחשבון גימטריא</title>
+  <meta name="description" content="מחשבון גימטריא מתקדם — כל שיטות החישוב, פעולות הכפל, מספרים צורניים, סדרות וחתך זהב, וחיפוש הפוך בתנ״ך.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- ערכת צבע לפני הצביעה (בלי הבהוב) — עוברת מלשקוד דרך ?theme=, נשמרת מקומית -->
+  <script>(function(){try{
+    var q=new URLSearchParams(location.search);
+    // מצב מוטמע: כשלשקוד פותח את המחשבון בתוך iframe (?embed=1) — מסתירים את כפתור "לשקוד"
+    // (החזרה מתבצעת מכותרת לשקוד עצמה) ואת באנר ההתקנה. מסמנים מוקדם כדי שלא יהבהב.
+    if(q.get('embed')==='1')document.documentElement.classList.add('embedded');
+    // אפליקציה עטופה (Median/GoNative) — מסתירים לוגו לשקוד ובאנר התקנה (כבר "מותקן")
+    if(/median|gonative/i.test(navigator.userAgent))document.documentElement.classList.add('median');
+    var V=['light','contrast','neurim-light','neurim-dark','dark'];
+    var p=q.get('theme');
+    if(V.indexOf(p)>=0)localStorage.setItem('gemTheme',p);
+    var t=(V.indexOf(p)>=0)?p:localStorage.getItem('gemTheme');
+    if(V.indexOf(t)<0)t='dark';                 /* ברירת מחדל כמו לשקוד */
+    if(t!=='dark')document.documentElement.classList.add(t);
+    var BG={dark:'#0d0b07',light:'#f2e7cc',contrast:'#000000','neurim-light':'#f5f2ff','neurim-dark':'#15131f'};
+    var mc=document.querySelector('meta[name=theme-color]'); if(mc)mc.content=BG[t]||BG.dark;
+    // גודל טקסט — מכוונן את גודל השורש (כל הגדלים ב-rem מתכווננים יחד)
+    var sc=parseFloat(localStorage.getItem('gemScale'));
+    if(sc>=0.7&&sc<=1.6)document.documentElement.style.fontSize=(16*sc)+'px';
+    // פונט התנ״ך — זהה לבחירה בלשקוד (?font=), נשמר מקומית; ברירת מחדל SBL
+    var F={sbl:"'SBL Hebrew',serif",frank:"'Taamey Frank CLM',serif",keter:"'Keter YG',serif",
+           shofar:"'Shofar',serif",stam:"'Shlomo SemiStam',serif",
+           arial:"'Arial Unicode MS','Arial',sans-serif",assistant:"'Assistant',sans-serif"};
+    var fp=q.get('font');
+    if(F[fp])localStorage.setItem('gemFont',fp);
+    var fid=F[fp]?fp:localStorage.getItem('gemFont');
+    if(!F[fid])fid='sbl';                        /* ברירת מחדל SBL */
+    document.documentElement.style.setProperty('--font-tanakh',F[fid]);
+  }catch(e){}})();</script>
+  <style>html.embedded .lishkod-logo,html.median .lishkod-logo{display:none}html.embedded .install-banner,html.median .install-banner{display:none!important}</style>
+</head>
+<body>
+  <!-- באנר התקנה (מוצג לפי מכשיר, רק כשלא מותקן) -->
+  <div id="installBanner" class="install-banner" hidden>
+    <span class="ib-text" id="installText"></span>
+    <button id="installBtn" class="ib-btn" hidden>התקנה</button>
+    <button id="installClose" class="ib-close" aria-label="סגירה">✕</button>
+  </div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="https://lishkod.app/" id="backLishkod" class="lishkod-logo" title="לשקוד" aria-label="פתיחת לשקוד">
+        <img src="lishkod-logo.png" alt="לשקוד" width="46" height="46">
+      </a>
+      <button id="settingsBtn" class="settings-btn" type="button" aria-label="הגדרות">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.48-.41h-3.84a.49.49 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.05.31-.07.63-.07.94s.02.63.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.3.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+      </button>
+      <h1>מחשבון גימטריא<span class="crown">א</span></h1>
+      <p class="tagline">כל דרכי החישוב · פעולות · מספרים צורניים · חיפוש בתנ״ך</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- קלט ראשי -->
+    <section class="input-card">
+      <div class="search-box" id="searchBox">
+        <svg class="sb-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        <input id="mainInput" type="text" inputmode="text" autocomplete="off"
+               placeholder="הקלידו כאן…" value="בראשית">
+        <button id="clearInput" class="sb-clear" type="button" aria-label="ניקוי וכתיבה מחדש">✕</button>
+      </div>
+      <div class="headline" id="headline"></div>
+    </section>
+
+    <!-- ניווט -->
+    <nav class="tabs" id="tabs">
+      <button data-tab="values" class="active">ערכי מילה</button>
+      <button data-tab="ops">פעולות</button>
+      <button data-tab="primes">ראשוניים</button>
+      <button data-tab="figurate">מספרים צורניים</button>
+      <button data-tab="series">סדרות</button>
+      <button data-tab="search">חיפוש בתנ״ך</button>
+    </nav>
+
+    <!-- ערכי מילה -->
+    <section class="tab" id="tab-values">
+      <div class="grid" id="valuesGrid"></div>
+      <div class="num-props" id="numProps" hidden></div>
+      <div class="rav-list" id="ravList" hidden></div>
+      <div class="breakdown" id="breakdown" hidden></div>
+    </section>
+
+    <!-- פעולות -->
+    <section class="tab" id="tab-ops" hidden>
+      <div class="op-block">
+        <h3>הכאה פרטית <small>מכפלה אות-מול-אות של שתי מילים באותו אורך · מתמלא אוטומטית כשמקלידים במחשבון שתי מילים שוות-אורך, ואפשר גם להזין כאן ידנית</small></h3>
+        <div class="two-inputs">
+          <input id="opA" type="text" placeholder="מילה א׳" value="אדם">
+          <span class="times">×</span>
+          <input id="opB" type="text" placeholder="מילה ב׳" value="חיה">
+        </div>
+        <div id="opResult" class="op-result"></div>
+      </div>
+
+      <div class="op-block">
+        <h3>ממוצע וכנפיים <small>ערך חלקי מספר האותיות / המילים, והסטייה השווה</small></h3>
+        <div id="avgResult" class="op-result"></div>
+      </div>
+
+      <div class="op-block">
+        <h3>נקודה אמצעית · שלם וחצי</h3>
+        <div id="midResult" class="op-result"></div>
+      </div>
+    </section>
+
+    <!-- ראשוניים -->
+    <section class="tab" id="tab-primes" hidden>
+      <div class="op-block">
+        <h3>פירוק לגורמים ראשוניים</h3>
+        <div id="primeFactor" class="op-result"></div>
+      </div>
+      <div class="op-block">
+        <h3>מחלקים <small>כל המחלקים של המספר וסכומם</small></h3>
+        <div id="primeDivisors" class="op-result"></div>
+      </div>
+      <div class="op-block">
+        <h3>יסוד <small>סכום המרכיבים הראשוניים (ללא 1)</small></h3>
+        <div id="primeYesod" class="op-result"></div>
+      </div>
+      <div class="op-block">
+        <h3>מקור <small>מכפלת מיקומי הגורמים בסדרת הראשוניים — כשמונים את 1 כאיבר הראשון (1,2,3,5,7,11…)</small></h3>
+        <div id="primeMakor" class="op-result"></div>
+      </div>
+      <div class="op-block">
+        <h3>יסוד + מקור</h3>
+        <div id="primeYM" class="op-result"></div>
+      </div>
+    </section>
+
+    <!-- מספרים צורניים -->
+    <section class="tab" id="tab-figurate" hidden>
+      <div class="fig-of">
+        <p>ניתוח המספר <b id="figValue">0</b> — לאילו מספרים צורניים הוא שייך:</p>
+        <div id="figIdentify" class="chips"></div>
+      </div>
+      <div class="fig-gen">
+        <h3>מחולל מספרים צורניים <small>מחשבון עצמאי לכל צורה וסדרה — מתעדכן אוטומטית כשהערך שבמחשבון הוא מספר צורני</small></h3>
+        <div class="gen-controls">
+          <select id="figType"></select>
+          <label>n = <input id="figN" type="number" value="5" min="1" style="width:5em"></label>
+        </div>
+        <div id="figGen" class="op-result"></div>
+        <div id="figDots" class="dots"></div>
+      </div>
+    </section>
+
+    <!-- סדרות -->
+    <section class="tab" id="tab-series" hidden>
+      <div class="op-block">
+        <h3>חתך זהב <small>gs(n) = (עליון, תחתון)</small></h3>
+        <div id="goldenResult" class="op-result"></div>
+      </div>
+      <div class="op-block">
+        <h3>סדרה חיבורית <small>שחזור הסדרה שהמספר שייך אליה (כמו סדרת פיבונאצ׳י)</small></h3>
+        <div id="additiveResult" class="op-result"></div>
+      </div>
+      <div class="op-block">
+        <h3>שיטת ההפרשים <small>הקלד סדרת מספרים (מופרדים בפסיק) לחישוב משולש ההפרשים ובסיס הסדרה</small></h3>
+        <input id="diffInput" type="text" placeholder="613, 11, 6, 3, 2, 1" value="613, 11, 6, 3, 2, 1">
+        <div id="diffResult" class="op-result"></div>
+      </div>
+      <div class="op-block">
+        <h3>סדרת פיבונאצ׳י <small>״מספרי אהבה״</small></h3>
+        <div id="fibResult" class="op-result"></div>
+      </div>
+    </section>
+
+    <!-- חיפוש בתנ"ך -->
+    <section class="tab" id="tab-search" hidden>
+      <div class="search-controls">
+        <label>ערך: <input id="searchValue" type="number" value="26" style="width:7em"></label>
+        <label>שיטה:
+          <select id="searchMethod">
+            <option value="hechrechi">הכרחי</option>
+            <option value="siduri">סידורי</option>
+            <option value="katan">קטן</option>
+            <option value="kidmi">קדמי</option>
+          </select>
+        </label>
+        <div class="scope-toggle">
+          <button data-scope="words" class="active">מילים</button>
+          <button data-scope="phrases">צירופים</button>
+          <button data-scope="verses">פסוקים</button>
+        </div>
+      </div>
+      <div id="searchStatus" class="search-status">טוען מאגר…</div>
+      <div id="searchResults" class="search-results"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>מבוסס על ״מבוא לגימטריא״ מתוך <i>עיניך ברכות בחשבון</i>. מאגר התנ״ך: Sefaria.</p>
+  </footer>
+
+  <!-- מסך הגדרות: ערכת צבעים + גודל טקסט -->
+  <div id="settingsOverlay" class="settings-overlay" hidden>
+    <div class="settings-panel" role="dialog" aria-modal="true" aria-label="הגדרות">
+      <div class="settings-head">
+        <h2>הגדרות</h2>
+        <button id="settingsClose" class="settings-close" type="button" aria-label="סגירה">✕</button>
+      </div>
+      <div class="settings-section">
+        <h3>ערכת צבעים</h3>
+        <div class="theme-grid" id="themeGrid"></div>
+      </div>
+      <div class="settings-section">
+        <h3>גודל טקסט</h3>
+        <div class="size-row" id="sizeRow"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- תפריט בחירת טקסט (כמו בלשקוד): בחירת מילה → ערכה + טעינה למחשבון -->
+  <div id="gemSel" role="menu" aria-label="פעולות על טקסט מסומן">
+    <button class="gs-copy" role="menuitem">העתקה</button>
+    <div class="gs-sep"></div>
+    <button class="gs-calc" role="menuitem"></button>
+  </div>
+
+  <script src="js/gematria.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    // SW רק בפרודקשן — ב-localhost הוא מגיש קבצים ישנים ומפריע לפיתוח
+    if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+      // כשגרסת SW חדשה משתלטת — רענון חד-פעמי כדי לקבל CSS/JS עדכני (סוף לתצוגה ישנה תקועה)
+      var swRefreshed = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (swRefreshed) return; swRefreshed = true; location.reload();
+      });
+    }
+
+    // ---- תפריט בחירת טקסט: טעינת מילה למחשבון (באותה שיטה כמו בלשקוד) ----
+    (function () {
+      var menu = document.getElementById('gemSel');
+      var btnCopy = menu.querySelector('.gs-copy');
+      var btnCalc = menu.querySelector('.gs-calc');
+      var cur = '';
+      var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+      if (coarse) menu.classList.add('touch');
+      function heb(s){ return (s||'').replace(/[^א-ת]/g,''); }
+      function val(s){ return (window.Gem ? Gem.hechrechi(s) : 0); }
+      function hide(){ menu.classList.remove('on'); cur=''; }
+      function show(){
+        var sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.rangeCount) { hide(); return; }
+        var an = sel.anchorNode && sel.anchorNode.parentElement;
+        if (an && an.closest('input,textarea,[contenteditable],#gemSel')) { hide(); return; }
+        var text = String(sel).trim();
+        if (heb(text).length < 2 || text.length > 300) { hide(); return; }
+        cur = text;
+        btnCalc.textContent = 'גימטריא · ' + val(text);
+        var r; try { r = sel.getRangeAt(0).getBoundingClientRect(); } catch(e){ hide(); return; }
+        if (!r || (!r.width && !r.height)) { hide(); return; }
+        menu.classList.add('on');
+        var mw = menu.offsetWidth, vw = window.innerWidth || document.documentElement.clientWidth || 360;
+        if (isIOS) { menu.classList.add('bar'); menu.style.left = Math.max(8,(vw-mw)/2)+'px'; menu.style.top=''; return; }
+        var mh = menu.offsetHeight;
+        var x = Math.max(8, Math.min(r.left + r.width/2 - mw/2, vw - mw - 8));
+        var y = r.top - mh - 10; if (y < 8) y = r.bottom + 10;
+        menu.style.left = x + 'px'; menu.style.top = y + 'px';
+      }
+      var t = null;
+      document.addEventListener('selectionchange', function(){ clearTimeout(t); t = setTimeout(show, 180); });
+      window.addEventListener('scroll', function(){ if (isIOS) return; if (menu.classList.contains('on')) { clearTimeout(t); t = setTimeout(show, 120); } }, {passive:true, capture:true});
+      document.addEventListener('contextmenu', function(e){
+        var sel = window.getSelection(); if (!sel || sel.isCollapsed) return;
+        var an = sel.anchorNode && sel.anchorNode.parentElement;
+        if (an && an.closest('input,textarea,[contenteditable]')) return;
+        if (heb(String(sel)).length >= 2) e.preventDefault();
+      });
+      btnCopy.addEventListener('click', function(){
+        var txt = cur;
+        var done = function(){ btnCopy.textContent = 'הועתק ✓'; setTimeout(function(){ btnCopy.textContent='העתקה'; hide(); }, 700); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, done);
+        else { try{ document.execCommand('copy'); }catch(_){} done(); }
+      });
+      btnCalc.addEventListener('click', function(){
+        if (!cur) return;
+        var inp = document.getElementById('mainInput');
+        // מנקים ניקוד/טעמים (מקף → רווח) כדי שהקלט יהיה נקי; הערך זהה
+        inp.value = cur.replace(/־/g, ' ').replace(/[֑-ׇ]/g, '').replace(/\s+/g, ' ').trim();
+        inp.dispatchEvent(new Event('input', {bubbles:true}));   // מפעיל את refresh() של המחשבון
+        var vt = document.querySelector('.tabs [data-tab=values]'); if (vt) vt.click();
+        try { window.getSelection().removeAllRanges(); } catch(_){}
+        hide();
+        window.scrollTo({ top:0, behavior:'smooth' });
+      });
+      document.addEventListener('pointerdown', function(e){
+        if (!menu.contains(e.target)) { var s = window.getSelection(); if (!s || s.isCollapsed) hide(); }
+      });
+    })();
+
+    // חזרה ללשקוד: אם הגענו משם — history.back() משמר את מצב האפליקציה
+    document.getElementById('backLishkod').addEventListener('click', function (e) {
+      try {
+        if (document.referrer && new URL(document.referrer).hostname.endsWith('lishkod.app') && history.length > 1) {
+          e.preventDefault();
+          history.back();
+        }
+      } catch (_) {}
+    });
+
+    // ---- באנר התקנה, מותאם למכשיר ----
+    (function () {
+      var banner = document.getElementById('installBanner');
+      var txt = document.getElementById('installText');
+      var btn = document.getElementById('installBtn');
+      var close = document.getElementById('installClose');
+      var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      if (standalone || localStorage.getItem('gemInstallDismissed')) return;
+
+      // הגעה מתוך לשקוד → בלי באנר התקנה (סימון לכל המושב, גם אחרי ניווט פנימי/רענון)
+      var refHost = (function () { try { return new URL(document.referrer).hostname; } catch (e) { return ''; } })();
+      var fromLishkod = new URLSearchParams(location.search).get('from') === 'lishkod'
+        || refHost === 'lishkod.app' || refHost === 'www.lishkod.app'
+        || sessionStorage.getItem('gemFromLishkod') === '1';
+      if (fromLishkod) { try { sessionStorage.setItem('gemFromLishkod', '1'); } catch (e) {} return; }
+
+      function show() { banner.hidden = false; }
+      function hide(remember) {
+        banner.hidden = true;
+        if (remember) localStorage.setItem('gemInstallDismissed', '1');
+      }
+      close.addEventListener('click', function () { hide(true); });
+      window.addEventListener('appinstalled', function () { hide(true); });
+
+      var ua = navigator.userAgent;
+      var isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      if (isIOS) {
+        // באייפון/אייפד אין prompt — מציגים הוראות
+        txt.innerHTML = 'להתקנה במכשיר: לחצו על <b>שיתוף</b> <span class="ib-ios">⎋</span> ואז <b>הוסף למסך הבית</b>';
+        show();
+      } else {
+        // אנדרואיד / דסקטופ: מחכים לאירוע ההתקנה של הדפדפן
+        var deferred = null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+          e.preventDefault();
+          deferred = e;
+          txt.innerHTML = 'התקינו את <b>מחשבון הגימטריא</b> במכשיר — עובד גם בלי אינטרנט';
+          btn.hidden = false;
+          show();
+        });
+        btn.addEventListener('click', function () {
+          if (!deferred) return;
+          deferred.prompt();
+          deferred.userChoice.then(function (c) {
+            if (c && c.outcome === 'accepted') hide(true); else hide(false);
+          });
+          deferred = null;
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

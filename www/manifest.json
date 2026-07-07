@@ -1,0 +1,16 @@
+{
+  "name": "מחשבון גימטריא",
+  "short_name": "גימטריא",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2e7cc",
+  "theme_color": "#f2e7cc",
+  "description": "מחשבון גימטריא מתקדם עם חיפוש הפוך בתנ״ך",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

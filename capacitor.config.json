@@ -1,0 +1,9 @@
+{
+  "appId": "app.lishkod.gematria",
+  "appName": "מחשבון גימטריא",
+  "webDir": "www",
+  "android": {
+    "appendUserAgent": "GematriaNative",
+    "backgroundColor": "#0d0b07"
+  }
+}
