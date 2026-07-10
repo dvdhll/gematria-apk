@@ -2,3 +2,6 @@ node_modules/
 android/
 *.log
 .DS_Store
+release-keystore.p12
+release-keystore-password.txt
+*.apk
