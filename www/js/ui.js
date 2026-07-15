@@ -1,7 +1,7 @@
 /* ui.js — קישור הממשק למנוע */
 (function () {
   'use strict';
-  const APP_VERSION = '1.0.31';   // לעדכן יחד עם גרסת ה-service worker
+  const APP_VERSION = '1.0.34';   // לעדכן יחד עם גרסת ה-service worker
   const G = window.Gem, S = window.GemSearch;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -21,8 +21,10 @@
     { key: 'merubaKlali', name: 'מרובע כללי', desc: 'הערך בריבוע', fn: t => G.merubaKlali(t) },
     { key: 'merubaPrati', name: 'מרובע פרטי', desc: 'סכום ריבועי האותיות', fn: t => G.merubaPrati(t) },
     { key: 'hakaah',    name: 'הכאה', desc: 'מכפלת האותיות', fn: t => G.hakaah(t) },
-    { key: 'letterCount', name: 'מספר אותיות', desc: 'ספירת האותיות', fn: t => G.letterCount(t) },
-    { key: 'wordCount',   name: 'מספר מילים', desc: 'ספירת המילים', fn: t => G.wordCount(t) },
+    // count: ספירה, לא ערך — בביטוי חשבוני לא מחילים עליה את הפעולה (מה זה "אותיות כפול
+    // אותיות"?). היא תמיד סופרת את כל הקלט; סימני הפעולה ממילא מסוננים ע"י onlyLetters/words.
+    { key: 'letterCount', name: 'מספר אותיות', desc: 'ספירת האותיות', count: true, fn: t => G.letterCount(t) },
+    { key: 'wordCount',   name: 'מספר מילים', desc: 'ספירת המילים', count: true, fn: t => G.wordCount(t) },
   ];
 
   let currentText = '';
@@ -30,20 +32,34 @@
   let currentExpr = null;    // {tokens} כשהקלט הוא ביטוי חשבוני, אחרת null
   let currentResult = null;  // תוצאת הביטוי בערך הכרחי (יכול להיות שבור/שלילי)
 
-  // ערך של שיטה עבור הקלט הנוכחי — דרך הביטוי אם יש, אחרת ישירות על הטקסט
-  function methodValue(fn){ return currentExpr ? G.evalExprWith(currentExpr.tokens, fn) : fn(currentText); }
+  // ערך של שיטה עבור הקלט הנוכחי — דרך הביטוי אם יש, אחרת ישירות על הטקסט.
+  // plain=true (שיטות ספירה) → תמיד על הטקסט המלא, בלי להחיל את הפעולה.
+  function methodValue(fn, plain){
+    return (currentExpr && !plain) ? G.evalExprWith(currentExpr.tokens, fn) : fn(currentText);
+  }
 
-  // פירוט ויזואלי של הביטוי בשיטה נתונה: "אב (3) ﬩ גד (7)"
-  const OP_SYM = { '+':'﬩', '-':'−', '*':'×', '/':'÷' };
-  function exprBreakdownHTML(fn){
+  // פירוט ויזואלי של הביטוי בשיטה נתונה: "אב (3) ﬩ גד (7)".
+  // sep — לשיטות ספירה, שבהן הפעולה לא מוחלת, מפרידים בנקודה במקום בסימן הפעולה.
+  const OP_SYM = { '+':'﬩', '-':'−', '*':'×', '/':'÷', '^':'^' };
+  function exprBreakdownHTML(fn, sep){
     return currentExpr.tokens.map(t => {
-      if (t.type === 'op') return `<span class="expr-op">${OP_SYM[t.op]}</span>`;
+      if (t.type === 'op') return `<span class="expr-op">${sep || OP_SYM[t.op]}</span>`;
       if (t.type === 'num') return `<span class="expr-opnd" dir="ltr">${t.text}</span>`;
       return `<span class="expr-opnd">${t.text} <span class="expr-val" dir="ltr">(${fmtNum(fn(t.text))})</span></span>`;
     }).join(' ');
   }
 
   function isNumeric(s) { return /^\s*\d+\s*$/.test(s); }
+
+  // המרה חיה בשדה: '+' → הפלוס העברי ﬩ (U+FB29), כמו בכל שאר האפליקציה.
+  // בטוח: ﬩ הוא תו-מפריד ולא אות עברית חזקה, ולכן dir="auto" עדיין נותן LTR לביטוי
+  // מספרי. שני התווים באורך יחידת-קוד אחת, אז מיקום הסמן נשמר. המנוע מנרמל ﬩→+ בחזרה.
+  function heifyPlus(el) {
+    if (el.value.indexOf('+') < 0) return;
+    const pos = el.selectionStart;
+    el.value = el.value.replace(/\+/g, '﬩');
+    try { el.setSelectionRange(pos, pos); } catch (_) {}
+  }
 
   function refresh() {
     const raw = $('mainInput').value;
@@ -142,7 +158,7 @@
       return;
     }
     METHODS.forEach(m => {
-      const v = methodValue(m.fn);
+      const v = methodValue(m.fn, m.count);
       const disp = fmtNum(v);
       const card = el('div', 'val-card' + (m.primary ? ' primary' : ''));
       card.innerHTML = `<div class="name">${m.name}</div><div class="value${String(disp).length > 9 ? ' long' : ''}">${disp}</div><div class="desc">${m.desc}</div>`;
@@ -156,10 +172,10 @@
     b.hidden = false;
     // מצב ביטוי: הצג את הפעולה על-פני האופרנדים בשיטה זו
     if (currentExpr) {
-      const value = methodValue(m.fn);
+      const value = methodValue(m.fn, m.count);
       const canSearch = Number.isInteger(value) && value >= 2 && value <= 500000;
       b.innerHTML = `<h4>${m.name}: <span class="hl">${fmtNum(value)}</span></h4>
-        <div class="sub expr-line">${exprBreakdownHTML(m.fn)} = <b class="hl">${fmtNum(value)}</b></div>` +
+        <div class="sub expr-line">${exprBreakdownHTML(m.fn, m.count ? '·' : null)} ${m.count ? '→ סה״כ' : '='} <b class="hl">${fmtNum(value)}</b></div>` +
         (canSearch ? `<div class="search-link"><button class="chip" onclick="GemUI.searchFor(${value},'hechrechi')">🔍 מצא בתנ״ך מילים/פסוקים ששווים ${value}</button></div>` : '');
       return;
     }
@@ -204,8 +220,8 @@
         // כנפיים של שני איברים סביב הממוצע? נציג את הממוצע כשלם.
         extra = `<div class="eq-note">הממוצע הוא מספר שלם: <b class="hl">${byL.avg}</b></div>`;
       }
-      avg.innerHTML = `לפי אותיות: ${byL.value} ÷ ${byL.count} = <b class="r-big">${round(byL.avg)}</b>` +
-        (byW.count > 1 ? `<br>לפי מילים: ${byW.value} ÷ ${byW.count} = <b class="hl">${round(byW.avg)}</b>` : '') + extra;
+      avg.innerHTML = `לפי אותיות: <span class="math">${byL.value} ÷ ${byL.count} = <b class="r-big">${round(byL.avg)}</b></span>` +
+        (byW.count > 1 ? `<br>לפי מילים: <span class="math">${byW.value} ÷ ${byW.count} = <b class="hl">${round(byW.avg)}</b></span>` : '') + extra;
     } else avg.innerHTML = '<span class="sub">הזן טקסט.</span>';
     // נקודה אמצעית
     const mid = $('midResult');
@@ -222,7 +238,7 @@
     const res = G.hakaahPratit(a, b);
     const box = $('opResult');
     if (res.error) { box.innerHTML = `<div class="eq-note">${res.error} (${res.len1} מול ${res.len2})</div>`; return; }
-    const rows = res.parts.map(p => `<td>${p.a}·${p.b}<br><b>${p.v1}×${p.v2}</b><br>${p.prod}</td>`).join('');
+    const rows = res.parts.map(p => `<td>${p.a}·${p.b}<br><b class="math">${p.v1}×${p.v2}</b><br>${p.prod}</td>`).join('');
     box.innerHTML = `<table><tr>${rows}</tr></table>
       <div style="margin-top:8px">סכום = <b class="r-big">${res.total}</b></div>`;
   }
@@ -288,7 +304,7 @@
       const idx = G.primeIndex(n);
       items.push(`<span class="np-item np-prime">ראשוני!${idx ? ` ה-<b>${idx}</b> בסדרה` : ''}</span>`);
     } else {
-      items.push(`<span class="np-item"><span class="np-label">פירוק</span><b>${f.map(x => x.p + sup(x.k)).join('×')}</b></span>`);
+      items.push(`<span class="np-item"><span class="np-label">פירוק</span><b class="math">${f.map(x => x.p + sup(x.k)).join('×')}</b></span>`);
     }
     items.push(`<span class="np-item"><span class="np-label">סכום מחלקים</span><b>${dv.sum}</b></span>`);
     if (!prime && ys != null) items.push(`<span class="np-item"><span class="np-label">יסוד</span><b>${ys}</b></span>`);
@@ -321,7 +337,7 @@
       $('primeFactor').innerHTML = `<b class="r-big">${n}</b> ראשוני!` +
         (idx ? ` <span class="eq-note" style="display:inline-block">ה-<b>${idx}</b> בסדרת הראשוניים (כשמונים את 1: 1, 2, 3, 5, 7, 11…)</span>` : '');
     } else {
-      $('primeFactor').innerHTML = `${n} = <b class="r-big">${f.map(x => x.p + sup(x.k)).join(' × ')}</b>`;
+      $('primeFactor').innerHTML = `<span class="math">${n} = <b class="r-big">${f.map(x => x.p + sup(x.k)).join(' × ')}</b></span>`;
     }
 
     // מחלקים
@@ -335,7 +351,7 @@
     const ys = G.yesod(n);
     $('primeYesod').innerHTML = G.isPrimeNum(n)
       ? `<span class="sub">מספר ראשוני — היסוד הוא המספר עצמו: <b class="hl">${ys}</b></span>`
-      : `${f.map(x => Array(x.k).fill(x.p).join(' <span class="plus">﬩</span> ')).join(' <span class="plus">﬩</span> ')} = <b class="r-big">${ys}</b>${findBtn(ys)}`;
+      : `<span class="math">${f.map(x => Array(x.k).fill(x.p).join(' <span class="plus">﬩</span> ')).join(' <span class="plus">﬩</span> ')} = <b class="r-big">${ys}</b></span>${findBtn(ys)}`;
 
     // מקור
     const mk = G.makor(n);
@@ -344,14 +360,14 @@
     } else {
       const mapping = mk.map.map(x => `${x.p}→<b>${x.idx}</b>${sup(x.k)}`).join(' · ');
       $('primeMakor').innerHTML =
-        `<div class="sub" style="direction:ltr;text-align:right">${mapping}</div>
-         ${mk.map.map(x => Array(x.k).fill(x.idx).join(' × ')).join(' × ')} = <b class="r-big">${mk.value}</b>${findBtn(mk.value)}`;
+        `<div class="sub math-block">${mapping}</div>
+         <span class="math">${mk.map.map(x => Array(x.k).fill(x.idx).join(' × ')).join(' × ')} = <b class="r-big">${mk.value}</b></span>${findBtn(mk.value)}`;
     }
 
     // יסוד + מקור
     if (mk && ys != null) {
       const t = ys + mk.value;
-      $('primeYM').innerHTML = `${ys} <span class="plus">﬩</span> ${mk.value} = <b class="r-big">${t}</b>${findBtn(t)}`;
+      $('primeYM').innerHTML = `<span class="math">${ys} <span class="plus">﬩</span> ${mk.value} = <b class="r-big">${t}</b></span>${findBtn(t)}`;
     } else $('primeYM').innerHTML = '<span class="sub">—</span>';
   }
 
@@ -464,10 +480,10 @@
     const nums = $('diffInput').value.split(/[,\s]+/).map(Number).filter(x => !isNaN(x));
     if (nums.length < 2) { $('diffResult').innerHTML = '<span class="sub">הזן לפחות שני מספרים.</span>'; return; }
     const tri = G.differenceTriangle(nums);
-    const rows = tri.map(r => `<div class="r">${r.join('  ')}</div>`).join('');
+    const rows = tri.map(r => `<div class="r math">${r.join('  ')}</div>`).join('');
     const base = tri[tri.length - 1];
     $('diffResult').innerHTML = `<div class="dots">${rows}</div>
-      <div class="eq-note">בסיס הסדרה: <b class="hl">${base.join(', ')}</b></div>`;
+      <div class="eq-note">בסיס הסדרה: <b class="hl math">${base.join(', ')}</b></div>`;
   }
 
   // ---- חיפוש בתנ"ך ----
@@ -736,7 +752,7 @@
     if ($('settingsOverlay')) $('settingsOverlay').addEventListener('click', e => { if (e.target === $('settingsOverlay')) closeSettings(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('settingsOverlay') && !$('settingsOverlay').hidden) closeSettings(); });
 
-    $('mainInput').addEventListener('input', refresh);
+    $('mainInput').addEventListener('input', () => { heifyPlus($('mainInput')); refresh(); });
     if ($('clearInput')) $('clearInput').addEventListener('click', () => { $('mainInput').value = ''; refresh(); $('mainInput').focus(); });
     $('opA').addEventListener('input', renderHakaahPratit);
     $('opB').addEventListener('input', renderHakaahPratit);

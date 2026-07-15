@@ -418,21 +418,25 @@
 
   // ---- ביטויי חשבון: חיבור/חיסור/כפל/חילוק בין מילים או מספרים ----------------
   const OP_MAP = { '＋':'+','﬩':'+','➕':'+','−':'-','–':'-','—':'-','‒':'-','×':'*','✕':'*','✖':'*','∙':'*','∗':'*','÷':'/','∕':'/','⁄':'/' };
-  function normalizeOps(str){ return String(str).replace(/[＋﬩➕−–—‒×✕✖∙∗÷∕⁄]/g, c => OP_MAP[c] || c); }
+  function normalizeOps(str){
+    return String(str)
+      .replace(/\*\*/g, '^')                                        // 2**3 → 2^3
+      .replace(/[＋﬩➕−–—‒×✕✖∙∗÷∕⁄]/g, c => OP_MAP[c] || c);
+  }
 
   // מנתח קלט לביטוי חשבוני. מחזיר {isExpr:true, tokens} או {isExpr:false}.
-  // אופרנד = מספר או רצף אותיות עבריות (מילה/צירוף). אופרטורים: + - * /  (קדימות כפל/חילוק).
+  // אופרנד = מספר או רצף אותיות עבריות (מילה/צירוף). אופרטורים: + - * / ^
   function parseExpr(input){
     if (input == null) return { isExpr:false };
     const s = normalizeOps(input).trim();
-    if (!s || !/[+\-*/]/.test(s.slice(1))) return { isExpr:false };   // חייב אופרטור לא-מוביל
-    const parts = s.split(/([+\-*/])/);
+    if (!s || !/[+\-*/^]/.test(s.slice(1))) return { isExpr:false };  // חייב אופרטור לא-מוביל
+    const parts = s.split(/([+\-*/^])/);
     const tokens = [];
     let expectOperand = true;
     for (const raw of parts){
       const t = raw.trim();
       if (t === '') continue;
-      if (/^[+\-*/]$/.test(t)){
+      if (/^[+\-*/^]$/.test(t)){
         if (expectOperand) return { isExpr:false };
         tokens.push({ type:'op', op:t });
         expectOperand = true;
@@ -449,22 +453,60 @@
     return { isExpr:true, tokens };
   }
 
-  // מעריך ביטוי: valueFn(word)->מספר לכל אופרנד-מילה; מספרים כמו שהם. קדימות כפל/חילוק.
+  // גבול שפיות לחזקה: 913^913 ≈ 2,700 ספרות עוד סביר, אבל 480000000^480000000 יתקע
+  // את הדפדפן. מעבר לגבול נופלים למסלול המספרים, שמחזיר Infinity מיד (מוצג כ-"—").
+  const POW_MAX_DIGITS = 3000;
+
+  // קדימות: חזקה (מימין לשמאל) → כפל/חילוק → חיבור/חיסור.
+  function _evalBig(v, ops){                       // כל הערכים שלמים ואין חילוק
+    for (let i = ops.length - 1; i >= 0; i--){     // חזקה — מימין לשמאל: 2^3^2 = 2^9
+      if (ops[i] !== '^') continue;
+      const b = v[i], e = v[i+1];
+      if (e < 0n) throw 0;                         // חזקה שלילית → תוצאה שברית
+      if (String(b < 0n ? -b : b).length * Number(e) > POW_MAX_DIGITS) throw 0;
+      v[i] = b ** e; v.splice(i+1, 1); ops.splice(i, 1);
+    }
+    for (let i = 0; i < ops.length; ){             // כפל
+      if (ops[i] === '*'){ v[i] *= v[i+1]; v.splice(i+1,1); ops.splice(i,1); } else i++;
+    }
+    let acc = v[0];                                // חיבור/חיסור
+    for (let i = 0; i < ops.length; i++) acc = ops[i] === '+' ? acc + v[i+1] : acc - v[i+1];
+    return acc;
+  }
+  function _evalNum(v, ops){
+    for (let i = ops.length - 1; i >= 0; i--){     // חזקה — מימין לשמאל
+      if (ops[i] !== '^') continue;
+      v[i] = Math.pow(v[i], v[i+1]); v.splice(i+1,1); ops.splice(i,1);
+    }
+    for (let i = 0; i < ops.length; ){             // כפל/חילוק
+      if (ops[i] === '*' || ops[i] === '/'){
+        v[i] = ops[i] === '*' ? v[i] * v[i+1] : v[i] / v[i+1];
+        v.splice(i+1,1); ops.splice(i,1);
+      } else i++;
+    }
+    let acc = v[0];                                // חיבור/חיסור
+    for (let i = 0; i < ops.length; i++) acc = ops[i] === '+' ? acc + v[i+1] : acc - v[i+1];
+    return acc;
+  }
+
+  // מעריך ביטוי: valueFn(word)->מספר לכל אופרנד-מילה; מספרים כמו שהם.
+  // הכאה מחזירה מחרוזת BigInt כשהמכפלה עוברת את MAX_SAFE_INTEGER — ולכן כשכל הערכים
+  // שלמים ואין חילוק מחשבים ב-BigInt: גם שומר על דיוק, וגם מונע שרשור מחרוזות ב-'+'.
   function evalExprWith(tokens, valueFn){
-    const vals = [], ops = [];
+    const raw = [], ops = [];
     for (const t of tokens){
       if (t.type === 'op') ops.push(t.op);
-      else vals.push(t.type === 'num' ? t.num : (valueFn(t.text) || 0));
+      else { const v = t.type === 'num' ? t.num : valueFn(t.text); raw.push(v == null ? 0 : v); }
     }
-    const v = [vals[0]], o = [];               // מעבר ראשון: כפל/חילוק
-    for (let i = 0; i < ops.length; i++){
-      if (ops[i] === '*') v[v.length-1] *= vals[i+1];
-      else if (ops[i] === '/') v[v.length-1] /= vals[i+1];
-      else { o.push(ops[i]); v.push(vals[i+1]); }
+    const isInt = v => typeof v === 'string' ? /^-?\d+$/.test(v) : Number.isInteger(v);
+    if (raw.every(isInt) && !ops.includes('/')){
+      try {
+        const acc = _evalBig(raw.map(v => BigInt(v)), ops.slice());
+        const LIM = BigInt(Number.MAX_SAFE_INTEGER);
+        return (acc <= LIM && acc >= -LIM) ? Number(acc) : acc.toString();
+      } catch (_) { /* חזקה שלילית/ענקית → נופלים למסלול המספרים */ }
     }
-    let acc = v[0];                            // מעבר שני: חיבור/חיסור
-    for (let i = 0; i < o.length; i++) acc = o[i] === '+' ? acc + v[i+1] : acc - v[i+1];
-    return acc;
+    return _evalNum(raw.map(v => Number(v) || 0), ops.slice());
   }
 
   // ---- ייצוא ----------------------------------------------------------------

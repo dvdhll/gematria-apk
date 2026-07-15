@@ -66,8 +66,11 @@
     <section class="input-card">
       <div class="search-box" id="searchBox">
         <svg class="sb-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-        <input id="mainInput" type="text" inputmode="text" autocomplete="off"
-               placeholder="מילה, מספר, או פעולה (אב ﬩ גד)…" value="בראשית">
+        <!-- dir="auto": ביטוי מספרי ("8-2*23") אין בו אות חזקה, ולכן ב-RTL ה-bidi היה מסדר
+             אותו מחדש ויזואלית — המשתמש ראה סדר אחד והאפליקציה קיבלה אחר. auto נותן לו LTR
+             (מוצג בדיוק כפי שהוקלד), ולטקסט עברי עדיין RTL לפי האות הראשונה. -->
+        <input id="mainInput" type="text" inputmode="text" autocomplete="off" dir="auto"
+               placeholder="מילה, מספר, או פעולה (אב ﬩ גד · אב^2)…" value="בראשית">
         <button id="clearInput" class="sb-clear" type="button" aria-label="ניקוי וכתיבה מחדש">✕</button>
       </div>
       <div class="headline" id="headline"></div>
@@ -224,12 +227,12 @@
       <details class="changelog">
         <!-- הערה: לעדכן את "גרסה N.N.N" יחד עם APP_VERSION (ui.js) ו-CACHE (sw.js) בכל פיצ'ר חדש.
              הגרסה כאן היא שמפעילה את באנר "מה חדש" — לכן מעדכנים אותה רק כשיש תוכן חדש למשתמש. -->
-        <summary>היסטוריית גרסאות <span class="cl-latest">· גרסה 1.0.31 · עודכן א' באב תשפ"ו</span></summary>
+        <summary>היסטוריית גרסאות <span class="cl-latest">· גרסה 1.0.33 · עודכן א' באב תשפ"ו</span></summary>
         <div class="cl-body">
           <div class="cl-ver">
             <p class="cl-date">א' באב תשפ"ו</p>
             <ul class="cl-list">
-              <li>פעולות חשבון בשורת הכתיבה: אפשר לחבר, לחסר, לכפול ולחלק — בין מספרים, בין מילים, או בשילוב (למשל "משיח ﬩ דוד"). הפעולה מחושבת בכל שיטות הגימטריא, והתוצאה נכנסת מיד לחיפוש בתנ"ך</li>
+              <li>פעולות חשבון בשורת הכתיבה: אפשר לחבר, לחסר, לכפול, לחלק ולהעלות בחזקה — בין מספרים, בין מילים, או בשילוב (למשל "משיח ﬩ דוד"). הפעולה מחושבת בכל שיטות הגימטריא, והתוצאה נכנסת מיד לחיפוש בתנ"ך</li>
               <li>במסך ההגדרות נוספו היסטוריית גרסאות וקישור להורדת קובץ התקנה (APK) למכשירים ללא דפדפן</li>
             </ul>
           </div>

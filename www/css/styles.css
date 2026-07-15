@@ -200,8 +200,18 @@ main{max-width:820px;margin:0 auto;padding:0 14px 60px}
 @keyframes wn-up{from{transform:translateY(130%);opacity:0} to{transform:none;opacity:1}}
 @keyframes wn-down{to{transform:translateY(130%);opacity:0}}
 
-/* פירוט ביטוי חשבוני בכותרת/בפירוט השיטה */
-.expr-line{margin-top:6px; font-size:1rem; line-height:1.7; color:var(--ink)}
+/* ═══ מתמטיקה תמיד LTR ═══
+   בהקשר RTL ה-bidi מסדר מחדש רצפי מספרים/אופרטורים: "11×83" מרונדר "83×11",
+   ו-"613 11 6 3 2 1" מרונדר הפוך. unicode-bidi:isolate מבודד את הרצף מהטקסט
+   העברי שסביבו, כך שאפשר לשים אותו גם בתוך משפט עברי בלי להזיז אותו. */
+.math{direction:ltr; unicode-bidi:isolate}
+.math-block{direction:ltr; text-align:right}   /* לבלוק שלם של מתמטיקה — כמו .series-list */
+
+/* פירוט ביטוי חשבוני בכותרת/בפירוט השיטה.
+   direction:ltr — הביטוי הוא מתמטיקה ונקרא משמאל לימין. בלי זה ה-bidi הופך את סדר
+   האיברים ויזואלית (8−2×23 נראה כ-2−8×23) גם כשהחישוב עצמו נכון. המילים העבריות
+   בתוך האופרנדים ממשיכות להיות מוצגות RTL כרגיל. */
+.expr-line{margin-top:6px; font-size:1rem; line-height:1.7; color:var(--ink); direction:ltr; text-align:center}
 .expr-line .expr-op{color:var(--gold); font-weight:800; margin:0 .15em}
 .expr-line .expr-val{color:var(--muted); font-size:.85em}
 .settings-ver{margin-top:6px; text-align:center; font-size:.72rem; color:var(--muted); opacity:.85}
