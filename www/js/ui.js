@@ -1,6 +1,7 @@
 /* ui.js — קישור הממשק למנוע */
 (function () {
   'use strict';
+  const APP_VERSION = '1.0.31';   // לעדכן יחד עם גרסת ה-service worker
   const G = window.Gem, S = window.GemSearch;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -15,8 +16,8 @@
     { key: 'katanAcharon', name: 'קטן מספרי אחרון', desc: 'צמצום לספרה בודדת', fn: t => G.katanMispariAcharon(t) },
     { key: 'gadol',     name: 'גדול', desc: 'סופיות 500–900', fn: t => G.hechrechi(t, { sofit: true }) },
     { key: 'milui',     name: 'מילוי (שמי)', desc: 'איות שם כל אות', fn: t => G.milui(t) },
-    { key: 'imHakolel', name: 'עם הכולל', desc: 'הכרחי + 1', fn: t => G.imHakolel(t) },
-    { key: 'mosaf',     name: 'מוסף', desc: 'הכרחי + מספר האותיות', fn: t => G.mosaf(t) },
+    { key: 'imHakolel', name: 'עם הכולל', desc: 'הכרחי <span class="plus">﬩</span> 1', fn: t => G.imHakolel(t) },
+    { key: 'mosaf',     name: 'מוסף', desc: 'הכרחי <span class="plus">﬩</span> מספר האותיות', fn: t => G.mosaf(t) },
     { key: 'merubaKlali', name: 'מרובע כללי', desc: 'הערך בריבוע', fn: t => G.merubaKlali(t) },
     { key: 'merubaPrati', name: 'מרובע פרטי', desc: 'סכום ריבועי האותיות', fn: t => G.merubaPrati(t) },
     { key: 'hakaah',    name: 'הכאה', desc: 'מכפלת האותיות', fn: t => G.hakaah(t) },
@@ -26,6 +27,21 @@
 
   let currentText = '';
   let currentNum = 0;
+  let currentExpr = null;    // {tokens} כשהקלט הוא ביטוי חשבוני, אחרת null
+  let currentResult = null;  // תוצאת הביטוי בערך הכרחי (יכול להיות שבור/שלילי)
+
+  // ערך של שיטה עבור הקלט הנוכחי — דרך הביטוי אם יש, אחרת ישירות על הטקסט
+  function methodValue(fn){ return currentExpr ? G.evalExprWith(currentExpr.tokens, fn) : fn(currentText); }
+
+  // פירוט ויזואלי של הביטוי בשיטה נתונה: "אב (3) ﬩ גד (7)"
+  const OP_SYM = { '+':'﬩', '-':'−', '*':'×', '/':'÷' };
+  function exprBreakdownHTML(fn){
+    return currentExpr.tokens.map(t => {
+      if (t.type === 'op') return `<span class="expr-op">${OP_SYM[t.op]}</span>`;
+      if (t.type === 'num') return `<span class="expr-opnd" dir="ltr">${t.text}</span>`;
+      return `<span class="expr-opnd">${t.text} <span class="expr-val" dir="ltr">(${fmtNum(fn(t.text))})</span></span>`;
+    }).join(' ');
+  }
 
   function isNumeric(s) { return /^\s*\d+\s*$/.test(s); }
 
@@ -33,12 +49,21 @@
     const raw = $('mainInput').value;
     currentText = raw;
     const sb = $('searchBox'); if (sb) sb.classList.toggle('has-text', raw.length > 0);
+    const expr = G.parseExpr(raw);
+    currentExpr = expr.isExpr ? expr : null;
     const letters = G.onlyLetters(raw);
-    if (letters) {
+    if (currentExpr) {
+      currentResult = G.evalExprWith(currentExpr.tokens, G.hechrechi);
+      // ניתוח מספרי (חיפוש/ראשוניים/צורני) רק על תוצאה שלמה חיובית
+      currentNum = Number.isInteger(currentResult) ? currentResult : 0;
+    } else if (letters) {
+      currentResult = null;
       currentNum = G.hechrechi(raw);
     } else if (isNumeric(raw)) {
+      currentResult = null;
       currentNum = parseInt(raw.trim(), 10);
     } else {
+      currentResult = null;
       currentNum = 0;
     }
     renderHeadline(letters);
@@ -57,6 +82,7 @@
 
   // מילוי אוטומטי של ההכאה הפרטית: שתי מילים שוות-אורך במחשבון
   function autoFillPair() {
+    if (currentExpr) return;   // בביטוי לא ממלאים אוטומטית את ההכאה הפרטית
     const ws = G.words(currentText);
     if (ws.length === 2 && G.onlyLetters(ws[0]).length === G.onlyLetters(ws[1]).length) {
       $('opA').value = ws[0];
@@ -88,14 +114,19 @@
   function renderHeadline(letters) {
     const h = $('headline');
     const heForm = heLetters(currentNum);
-    if (letters) {
+    if (currentExpr) {
+      const isInt = Number.isInteger(currentResult);
+      h.innerHTML = `<div class="big">${fmtNum(currentResult)}</div>
+        <span class="big-label">תוצאה${isInt && heForm ? ' · ' + heForm : ''}</span>
+        <div class="sub expr-line">${exprBreakdownHTML(G.hechrechi)}</div>`;
+    } else if (letters) {
       h.innerHTML = `<div class="big">${G.hechrechi(currentText)}</div>
         <span class="big-label">ערך הכרחי${heForm ? ' · ' + heForm : ''}</span>
         <div class="sub">${plural(G.letterCount(currentText), 'אות אחת', 'אותיות')} · ${plural(G.wordCount(currentText), 'מילה אחת', 'מילים')}</div>`;
     } else if (currentNum) {
       h.innerHTML = `<div class="big">${currentNum}</div><span class="big-label">מספר${heForm ? ' · ' + heForm : ''}</span>`;
     } else {
-      h.innerHTML = `<div class="sub">הקלד טקסט עברי או מספר…</div>`;
+      h.innerHTML = `<div class="sub">הקלידו טקסט עברי, מספר, או פעולת חשבון — למשל <span dir="ltr">אב ﬩ גד</span> או <span dir="ltr">5 × 7</span></div>`;
     }
   }
 
@@ -103,12 +134,15 @@
     const grid = $('valuesGrid');
     grid.innerHTML = '';
     if (!letters) {
-      grid.innerHTML = '<p class="sub" style="grid-column:1/-1;color:var(--muted)">— הזן טקסט עברי כדי לראות את ערכי המילה —</p>';
+      const msg = currentExpr
+        ? '— פעולה בין מספרים בלבד. הזינו מילה עברית כדי לראות את הפעולה בכל השיטות —'
+        : '— הזן טקסט עברי כדי לראות את ערכי המילה —';
+      grid.innerHTML = `<p class="sub" style="grid-column:1/-1;color:var(--muted)">${msg}</p>`;
       $('breakdown').hidden = true;
       return;
     }
     METHODS.forEach(m => {
-      const v = m.fn(currentText);
+      const v = methodValue(m.fn);
       const disp = fmtNum(v);
       const card = el('div', 'val-card' + (m.primary ? ' primary' : ''));
       card.innerHTML = `<div class="name">${m.name}</div><div class="value${String(disp).length > 9 ? ' long' : ''}">${disp}</div><div class="desc">${m.desc}</div>`;
@@ -120,6 +154,15 @@
   function showBreakdown(m) {
     const b = $('breakdown');
     b.hidden = false;
+    // מצב ביטוי: הצג את הפעולה על-פני האופרנדים בשיטה זו
+    if (currentExpr) {
+      const value = methodValue(m.fn);
+      const canSearch = Number.isInteger(value) && value >= 2 && value <= 500000;
+      b.innerHTML = `<h4>${m.name}: <span class="hl">${fmtNum(value)}</span></h4>
+        <div class="sub expr-line">${exprBreakdownHTML(m.fn)} = <b class="hl">${fmtNum(value)}</b></div>` +
+        (canSearch ? `<div class="search-link"><button class="chip" onclick="GemUI.searchFor(${value},'hechrechi')">🔍 מצא בתנ״ך מילים/פסוקים ששווים ${value}</button></div>` : '');
+      return;
+    }
     const value = m.fn(currentText);
     let rows = '';
     // פירוט אות-אות עבור השיטות הישירות
@@ -134,7 +177,7 @@
       rows = `<div class="sub">${parts.join(' × ')} = <b class="hl">${value}</b></div>`;
     } else if (m.key === 'merubaPrati') {
       const parts = [...G.onlyLetters(currentText)].map(ch => { const x=G.letterValue(ch,'hechrechi'); return `${x}²`; });
-      rows = `<div class="sub">${parts.join(' + ')} = <b class="hl">${value}</b></div>`;
+      rows = `<div class="sub">${parts.join(' <span class="plus">﬩</span> ')} = <b class="hl">${value}</b></div>`;
     } else if (m.key === 'milui') {
       const chips = [...G.onlyLetters(currentText)].map(ch => {
         const base = G.FINAL_TO_BASE[ch] || ch; const name = G.MILUI[base] || ch;
@@ -151,7 +194,9 @@
     renderHakaahPratit();
     // ממוצע
     const avg = $('avgResult');
-    if (letters) {
+    if (currentExpr) {
+      avg.innerHTML = '<span class="sub">— הממוצע חל על טקסט, לא על פעולת חשבון —</span>';
+    } else if (letters) {
       const byL = G.memutza(currentText, 'letters');
       const byW = G.memutza(currentText, 'words');
       let extra = '';
@@ -167,8 +212,8 @@
     if (currentNum) {
       const mp = G.midpoint(currentNum);
       mid.innerHTML = mp.type === 'odd'
-        ? `${currentNum} אי-זוגי → נקודה אמצעית = <b class="r-big">${mp.middle}</b> <span class="sub">(סימון ${currentNum} ·&gt; ${mp.middle})</span>`
-        : `${currentNum} זוגי → אין נקודה אמצעית. יחס ״שלם וחצי״: ${currentNum} ↔ <b class="r-big">${mp.half}</b>`;
+        ? `${currentNum} אי-זוגי ← נקודה אמצעית = <b class="r-big">${mp.middle}</b> <span class="sub">(סימון <span dir="ltr">${currentNum} ·&gt; ${mp.middle}</span>)</span>`
+        : `${currentNum} זוגי ← אין נקודה אמצעית. יחס ״שלם וחצי״: <span dir="ltr">${currentNum} ↔ <b class="r-big">${mp.half}</b></span>`;
     } else mid.innerHTML = '<span class="sub">—</span>';
   }
 
@@ -248,7 +293,7 @@
     items.push(`<span class="np-item"><span class="np-label">סכום מחלקים</span><b>${dv.sum}</b></span>`);
     if (!prime && ys != null) items.push(`<span class="np-item"><span class="np-label">יסוד</span><b>${ys}</b></span>`);
     if (mk && !prime) items.push(`<span class="np-item"><span class="np-label">מקור</span><b>${mk.value}</b></span>`);
-    if (mk && !prime && ys != null) items.push(`<span class="np-item"><span class="np-label">יסוד+מקור</span><b>${ys + mk.value}</b></span>`);
+    if (mk && !prime && ys != null) items.push(`<span class="np-item"><span class="np-label">יסוד<span class="plus">﬩</span>מקור</span><b>${ys + mk.value}</b></span>`);
     // זיהוי צורני — רק אם יש
     const figs = G.identifyFigurate(n);
     figs.forEach(h => items.push(`<span class="np-item np-fig">${G.FIGURATE[h.type].he} ה-${h.index}</span>`));
@@ -290,7 +335,7 @@
     const ys = G.yesod(n);
     $('primeYesod').innerHTML = G.isPrimeNum(n)
       ? `<span class="sub">מספר ראשוני — היסוד הוא המספר עצמו: <b class="hl">${ys}</b></span>`
-      : `${f.map(x => Array(x.k).fill(x.p).join(' + ')).join(' + ')} = <b class="r-big">${ys}</b>${findBtn(ys)}`;
+      : `${f.map(x => Array(x.k).fill(x.p).join(' <span class="plus">﬩</span> ')).join(' <span class="plus">﬩</span> ')} = <b class="r-big">${ys}</b>${findBtn(ys)}`;
 
     // מקור
     const mk = G.makor(n);
@@ -306,7 +351,7 @@
     // יסוד + מקור
     if (mk && ys != null) {
       const t = ys + mk.value;
-      $('primeYM').innerHTML = `${ys} + ${mk.value} = <b class="r-big">${t}</b>${findBtn(t)}`;
+      $('primeYM').innerHTML = `${ys} <span class="plus">﬩</span> ${mk.value} = <b class="r-big">${t}</b>${findBtn(t)}`;
     } else $('primeYM').innerHTML = '<span class="sub">—</span>';
   }
 
@@ -531,7 +576,11 @@
   // פורמט מספרים גדולים: מפרידי אלפים (גם למחרוזות BigInt מההכאה)
   function fmtNum(v){
     if (typeof v === 'string') return v.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    if (typeof v === 'number' && Math.abs(v) >= 1000000) return v.toLocaleString('en-US');
+    if (typeof v === 'number') {
+      if (!Number.isFinite(v)) return '—';                       // חלוקה באפס
+      if (!Number.isInteger(v)) v = Math.round(v * 1000) / 1000;  // עיגול שברים (חילוק)
+      if (Math.abs(v) >= 1000000) return v.toLocaleString('en-US');
+    }
     return v;
   }
 
@@ -593,8 +642,90 @@
   function openSettings() { buildSettings(); $('settingsOverlay').hidden = false; }
   function closeSettings() { $('settingsOverlay').hidden = true; }
 
+  // ---- באנר "מה חדש" (בשיטת לִשְׁקֹד) ------------------------------------------
+  // כרטיס תחתון לא-חוסם, פעם אחת לכל גרסה. מספר הגרסה חי ב-.cl-latest של היסטוריית
+  // הגרסאות — כך שהבאנר עולה רק כשבאמת נוסף תוכן חדש (ולא בכל פריסת תיקונים).
+  // למשתמש חדש לא מציגים כלום (אין מה להשלים) — רק רושמים בשקט את גרסתו.
+  const WN_KEY = 'gemWnVer';
+  function _wnCurrentVer() {
+    try { const el = document.querySelector('.changelog .cl-latest');
+      const m = el && (el.textContent || '').match(/גרסה\s+([\d.]+)/); return m ? m[1] : ''; }
+    catch (_) { return ''; }
+  }
+  // מפתח בר-השוואה: "1.0.31" → "00001.00000.00031"
+  const _wnKeyOf = v => String(v).split('.').map(n => String(n).padStart(5, '0')).join('.');
+
+  // זיהוי משתמש חוזר שאין לו עדיין גרסה שמורה (כלומר: היה כאן לפני שהמנגנון הזה הופעל).
+  // בלעדיו הוא היה נחשב "חדש" ומפספס את הבאדנר על הגרסה הראשונה שבה המנגנון עלה.
+  // שני סימנים: (1) מפתח הגדרות קיים; (2) הדף כבר נשלט ע"י service worker — מה שקורה רק
+  // בביקור חוזר (בביקור ראשון ה-SW עוד מתקין בזמן ש-initWhatsNew רץ).
+  const WN_LEGACY_KEYS = ['gemTheme', 'gemScale', 'gemFont', 'gemInstallDismissed'];
+  function _wnReturningUser() {
+    try {
+      if (WN_LEGACY_KEYS.some(k => localStorage.getItem(k) !== null)) return true;
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) return true;
+      return false;
+    } catch (_) { return false; }
+  }
+
+  function wnOpenHistory() {
+    try {
+      openSettings();
+      setTimeout(() => {
+        const d = document.querySelector('#settingsOverlay .changelog');
+        if (!d) return;
+        d.open = true;
+        (d.querySelector('summary') || d).scrollIntoView({ block: 'center', behavior: 'auto' });
+      }, 140);
+    } catch (_) {}
+  }
+
+  function initWhatsNew() {
+    try {
+      const cur = _wnCurrentVer(); if (!cur) return;
+      const seen = localStorage.getItem(WN_KEY) || '';
+      // משתמש חדש לגמרי → רישום שקט, אין מה להשלים. משתמש חוזר בלי גרסה שמורה → כן מציגים.
+      if (!seen && !_wnReturningUser()) { localStorage.setItem(WN_KEY, cur); return; }
+      if (seen && _wnKeyOf(seen) >= _wnKeyOf(cur)) return;             // כבר מעודכן
+      // הצצה = פריטי הגרסה החדשה ביותר (הרשימה המלאה במרחק לחיצה)
+      const ver = document.querySelector('.changelog .cl-ver');
+      const items = ver ? [...ver.querySelectorAll('.cl-list li')].map(li => (li.textContent || '').trim()).filter(Boolean) : [];
+      if (!items.length) { localStorage.setItem(WN_KEY, cur); return; }
+      setTimeout(() => { if (!document.getElementById('whatsnew-banner')) _wnBuild(items, cur); }, 1200);
+    } catch (_) {}
+  }
+
+  function _wnBuild(items, cur) {
+    try {
+      const seal = () => { try { localStorage.setItem(WN_KEY, cur); } catch (_) {} };
+      const wrap = el('div'); wrap.id = 'whatsnew-banner';
+      const card = el('div', 'wn-card');
+      const head = el('div', 'wn-head');
+      const title = el('span', 'wn-title'); title.textContent = '🎁 מה חדש בגימטריא';
+      const x = el('button', 'wn-x'); x.setAttribute('aria-label', 'סגירה'); x.textContent = '✕';
+      head.appendChild(title); head.appendChild(x);
+      const body = el('div', 'wn-body');
+      const ul = el('ul', 'wn-list');
+      items.slice(0, 3).forEach(t => { const li = el('li'); li.textContent = t; ul.appendChild(li); });
+      body.appendChild(ul);
+      const actions = el('div', 'wn-actions');
+      const go = el('button', 'wn-go'); go.textContent = 'כל מה שחדש ›';
+      const ok = el('button', 'wn-ok'); ok.textContent = 'הבנתי';
+      actions.appendChild(go); actions.appendChild(ok);
+      card.appendChild(head); card.appendChild(body); card.appendChild(actions);
+      wrap.appendChild(card); document.body.appendChild(wrap);
+      const dismiss = () => { seal(); wrap.classList.add('wn-out'); setTimeout(() => { try { wrap.remove(); } catch (_) {} }, 300); };
+      x.addEventListener('click', dismiss);
+      ok.addEventListener('click', dismiss);
+      go.addEventListener('click', () => { dismiss(); wnOpenHistory(); });
+    } catch (_) {}
+  }
+
   // ---- אתחול ----
   function init() {
+    // מספר גרסה במסך ההגדרות
+    if ($('appVersion')) $('appVersion').textContent = APP_VERSION;
+
     // מילוי בורר סוגי צורניים
     const sel = $('figType');
     Object.keys(G.FIGURATE).forEach(k => { const o = el('option', '', G.FIGURATE[k].he); o.value = k; sel.appendChild(o); });
@@ -635,6 +766,7 @@
     }
     const tab = (location.hash || '').replace('#', '');
     if (['values','ops','primes','figurate','series','search'].includes(tab)) switchTab(tab);
+    initWhatsNew();   // באנר "מה חדש" — פעם אחת לכל גרסה (לא למשתמש חדש)
   }
   document.addEventListener('DOMContentLoaded', init);
 })();

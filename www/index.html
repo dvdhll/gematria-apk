@@ -67,7 +67,7 @@
       <div class="search-box" id="searchBox">
         <svg class="sb-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
         <input id="mainInput" type="text" inputmode="text" autocomplete="off"
-               placeholder="הקלידו כאן…" value="בראשית">
+               placeholder="מילה, מספר, או פעולה (אב ﬩ גד)…" value="בראשית">
         <button id="clearInput" class="sb-clear" type="button" aria-label="ניקוי וכתיבה מחדש">✕</button>
       </div>
       <div class="headline" id="headline"></div>
@@ -133,7 +133,7 @@
         <div id="primeMakor" class="op-result"></div>
       </div>
       <div class="op-block">
-        <h3>יסוד + מקור</h3>
+        <h3>יסוד <span class="plus">﬩</span> מקור</h3>
         <div id="primeYM" class="op-result"></div>
       </div>
     </section>
@@ -218,6 +218,34 @@
         <h3>גודל טקסט</h3>
         <div class="size-row" id="sizeRow"></div>
       </div>
+      <div class="settings-ver">מחשבון גימטריא · גרסה <span id="appVersion">—</span></div>
+      <!-- כתובת מוחלטת בכוונה: הקישור נצרב גם לתוך ה-APK, ושם נתיב יחסי אינו קיים -->
+      <div class="settings-dl">להורדת קובץ התקנה במכשירים ללא דפדפן <a href="https://gematria.lishkod.app/apk" download="מחשבון-גימטריא.apk">לחצו כאן</a></div>
+      <details class="changelog">
+        <!-- הערה: לעדכן את "גרסה N.N.N" יחד עם APP_VERSION (ui.js) ו-CACHE (sw.js) בכל פיצ'ר חדש.
+             הגרסה כאן היא שמפעילה את באנר "מה חדש" — לכן מעדכנים אותה רק כשיש תוכן חדש למשתמש. -->
+        <summary>היסטוריית גרסאות <span class="cl-latest">· גרסה 1.0.31 · עודכן א' באב תשפ"ו</span></summary>
+        <div class="cl-body">
+          <div class="cl-ver">
+            <p class="cl-date">א' באב תשפ"ו</p>
+            <ul class="cl-list">
+              <li>פעולות חשבון בשורת הכתיבה: אפשר לחבר, לחסר, לכפול ולחלק — בין מספרים, בין מילים, או בשילוב (למשל "משיח ﬩ דוד"). הפעולה מחושבת בכל שיטות הגימטריא, והתוצאה נכנסת מיד לחיפוש בתנ"ך</li>
+              <li>במסך ההגדרות נוספו היסטוריית גרסאות וקישור להורדת קובץ התקנה (APK) למכשירים ללא דפדפן</li>
+            </ul>
+          </div>
+          <div class="cl-ver">
+            <p class="cl-date">כ"ב בתמוז תשפ"ו</p>
+            <ul class="cl-list">
+              <li>השקת מחשבון הגימטריא, על פי "מבוא לגימטריא" מתוך הספר "עיניך ברכות בחשבון": כל שיטות החישוב — הכרחי, סידורי, קטן, קדמי, מילוי, מרובע, הכאה ועוד</li>
+              <li>חיפוש הפוך בתנ"ך: כל המילים, הצירופים והפסוקים ששווים לערך שחיפשתם</li>
+              <li>מרכיבים ראשוניים: פירוק לגורמים, מחלקים, יסוד ומקור</li>
+              <li>מספרים צורניים: זיהוי וציור של הצורה — משולש, השראה, שבת, מגן-דוד ועוד</li>
+              <li>רשימת "ערכים ומראי מקומות" של הרב, צמודה לכל מספר</li>
+              <li>ערכות צבע וגודל טקסט, ושילוב עם "לִשְׁקֹד" — בחירת טקסט שם פותחת אותו כאן</li>
+            </ul>
+          </div>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -253,13 +281,23 @@
       if (coarse) menu.classList.add('touch');
       function heb(s){ return (s||'').replace(/[^א-ת]/g,''); }
       function val(s){ return (window.Gem ? Gem.hechrechi(s) : 0); }
+      // חילוץ טקסט הבחירה תוך הסרת אלמנטים שאינם חלק מהפסוק — בעיקר מראי-מקום
+      // (.ref, מספרי פרק:פסוק באותיות עבריות) וניווט הרשימה. כמו selText בלשקוד.
+      function selText(sel){
+        try{
+          var d = document.createElement('div');
+          d.appendChild(sel.getRangeAt(0).cloneContents());
+          d.querySelectorAll('.ref,.rav-nav,.rav-src,.np-label,.big-label').forEach(function(e){ e.remove(); });
+          return d.textContent;
+        }catch(_){ return String(sel); }
+      }
       function hide(){ menu.classList.remove('on'); cur=''; }
       function show(){
         var sel = window.getSelection();
         if (!sel || sel.isCollapsed || !sel.rangeCount) { hide(); return; }
         var an = sel.anchorNode && sel.anchorNode.parentElement;
         if (an && an.closest('input,textarea,[contenteditable],#gemSel')) { hide(); return; }
-        var text = String(sel).trim();
+        var text = selText(sel).trim();
         if (heb(text).length < 2 || text.length > 300) { hide(); return; }
         cur = text;
         btnCalc.textContent = 'גימטריא · ' + val(text);

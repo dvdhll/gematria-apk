@@ -62,17 +62,28 @@
   }
 
   // ---- ניקוי טקסט -----------------------------------------------------------
-  // משאיר רק אותיות עבריות; מסיר ניקוד, טעמים, פיסוק, ספרות.
+  // סימוני מקרא: החישוב לפי ה"כתיב" בלבד.
+  //  • כתיב  (בסוגריים עגולים)  — נכלל בחישוב, מסירים רק את הסוגריים.
+  //  • קרי   [בסוגריים מרובעים] — מושמט לגמרי.
+  //  • מסורה *(בעיגול עם אסטריסק) — מושמטת (כמו בלשקוד; שונה מכתיב שאין לפניו אסטריסק).
+  //  • סימני פרשה פתוחה/סתומה/שירה {פ}/{ס}/{ש} (בסוגריים מסולסלים) — מושמטים.
+  function stripNotation(str) {
+    return String(str)
+      .replace(/\[[^\]]*\]/g, ' ')       // קרי — הסרה
+      .replace(/\*\s*\([^)]*\)/g, ' ')    // מסורה *(…) — הסרה (אסטריסק + עגולים)
+      .replace(/\{[^}]*\}/g, ' ')        // סימני פרשה — הסרה
+      .replace(/[()]/g, '');              // כתיב (…) — הסרת הסוגריים בלבד, שמירת התוכן
+  }
+  // משאיר רק אותיות עבריות; מסיר סימוני מקרא, ניקוד, טעמים, פיסוק, ספרות.
   function onlyLetters(str) {
     if (!str) return '';
-    // הסרת ניקוד/טעמים (U+0591–U+05C7) ותווים שאינם אותיות א–ת/סופיות
-    return String(str)
+    return stripNotation(String(str))
       .replace(/[֑-ׇ]/g, '')          // ניקוד וטעמים
       .replace(/[^א-ת]/g, '');          // רק א..ת + סופיות
   }
   function words(str) {
     if (!str) return [];
-    return String(str)
+    return stripNotation(String(str))
       .replace(/[֑-ׇ]/g, '')
       .split(/[^א-ת]+/)
       .filter(Boolean);
@@ -405,10 +416,61 @@
     };
   }
 
+  // ---- ביטויי חשבון: חיבור/חיסור/כפל/חילוק בין מילים או מספרים ----------------
+  const OP_MAP = { '＋':'+','﬩':'+','➕':'+','−':'-','–':'-','—':'-','‒':'-','×':'*','✕':'*','✖':'*','∙':'*','∗':'*','÷':'/','∕':'/','⁄':'/' };
+  function normalizeOps(str){ return String(str).replace(/[＋﬩➕−–—‒×✕✖∙∗÷∕⁄]/g, c => OP_MAP[c] || c); }
+
+  // מנתח קלט לביטוי חשבוני. מחזיר {isExpr:true, tokens} או {isExpr:false}.
+  // אופרנד = מספר או רצף אותיות עבריות (מילה/צירוף). אופרטורים: + - * /  (קדימות כפל/חילוק).
+  function parseExpr(input){
+    if (input == null) return { isExpr:false };
+    const s = normalizeOps(input).trim();
+    if (!s || !/[+\-*/]/.test(s.slice(1))) return { isExpr:false };   // חייב אופרטור לא-מוביל
+    const parts = s.split(/([+\-*/])/);
+    const tokens = [];
+    let expectOperand = true;
+    for (const raw of parts){
+      const t = raw.trim();
+      if (t === '') continue;
+      if (/^[+\-*/]$/.test(t)){
+        if (expectOperand) return { isExpr:false };
+        tokens.push({ type:'op', op:t });
+        expectOperand = true;
+      } else {
+        if (!expectOperand) return { isExpr:false };
+        if (/^\d+(?:\.\d+)?$/.test(t)) tokens.push({ type:'num', text:t, num:parseFloat(t) });
+        else if (onlyLetters(t)) tokens.push({ type:'word', text:t });
+        else return { isExpr:false };
+        expectOperand = false;
+      }
+    }
+    if (expectOperand) return { isExpr:false };                       // מסתיים באופרטור
+    if (!tokens.some(x => x.type === 'op')) return { isExpr:false };
+    return { isExpr:true, tokens };
+  }
+
+  // מעריך ביטוי: valueFn(word)->מספר לכל אופרנד-מילה; מספרים כמו שהם. קדימות כפל/חילוק.
+  function evalExprWith(tokens, valueFn){
+    const vals = [], ops = [];
+    for (const t of tokens){
+      if (t.type === 'op') ops.push(t.op);
+      else vals.push(t.type === 'num' ? t.num : (valueFn(t.text) || 0));
+    }
+    const v = [vals[0]], o = [];               // מעבר ראשון: כפל/חילוק
+    for (let i = 0; i < ops.length; i++){
+      if (ops[i] === '*') v[v.length-1] *= vals[i+1];
+      else if (ops[i] === '/') v[v.length-1] /= vals[i+1];
+      else { o.push(ops[i]); v.push(vals[i+1]); }
+    }
+    let acc = v[0];                            // מעבר שני: חיבור/חיסור
+    for (let i = 0; i < o.length; i++) acc = o[i] === '+' ? acc + v[i+1] : acc - v[i+1];
+    return acc;
+  }
+
   // ---- ייצוא ----------------------------------------------------------------
   const API = {
     LETTER, BASE, FINAL_GADOL, FINAL_TO_BASE, ORDER, MILUI, FIGURATE, PHI,
-    onlyLetters, words, letterValue, digitalRoot, digitSum, letterCount, wordCount,
+    onlyLetters, words, stripNotation, letterValue, digitalRoot, digitSum, letterCount, wordCount,
     hechrechi, siduri, katan, kidmi,
     katanMispari, katanMispariAcharon, katanMispariSheni,
     imHakolel, mosaf, merubaKlali, merubaPrati, milui,
@@ -417,6 +479,7 @@
     figurateSeries, figurateOf, identifyFigurate,
     goldenSection, additiveSeriesFor, fibonacci, differenceTriangle,
     factorize, isPrimeNum, divisorsOf, primeIndex, yesod, makor,
+    normalizeOps, parseExpr, evalExprWith,
     analyze,
   };
 

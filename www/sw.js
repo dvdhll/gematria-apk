@@ -1,5 +1,5 @@
 /* service worker — קאשינג לאופליין */
-const CACHE = 'gematria-v20';
+const CACHE = 'gematria-v31';
 const ASSETS = [
   './', './index.html', './css/styles.css',
   './js/gematria.js', './js/search.js', './js/ui.js',
@@ -32,6 +32,8 @@ function networkFirst(req){
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+  // קובץ ההתקנה (.apk או נתיב הפרוקסי /apk) — הורדה ישירה, בלי קאשינג של 5MB
+  if (/\.apk$/.test(url.pathname) || /\/apk$/.test(url.pathname)) return;
   const bigStatic = /\/(data|fonts)\//.test(url.pathname) ||
     /\.(json|ttf|woff2?|png|svg)$/.test(url.pathname);
   e.respondWith(bigStatic ? cacheFirst(e.request) : networkFirst(e.request));
