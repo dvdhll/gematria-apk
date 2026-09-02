@@ -56,5 +56,6 @@ for (const p of PATCHES) {
   console.log(`✓ הותאם: ${p.name}`);
 }
 
-const ver = (fs.readFileSync(path.join(DST, 'js', 'ui.js'), 'utf8').match(/APP_VERSION\s*=\s*'([\d.]+)'/) || [])[1];
-console.log(`\n✓ www/ מסונכרן — גרסה ${ver || '?'}\n  להמשך:  git add www && git commit -m "sync www ${ver || ''}" && git push`);
+// גרסת הבנייה = מספר ה-CACHE ב-sw.js (מקור אמת יחיד; APP_VERSION הוסר).
+const ver = (fs.readFileSync(path.join(DST, 'sw.js'), 'utf8').match(/gematria-v(\d+)/) || [])[1];
+console.log(`\n✓ www/ מסונכרן — גרסת בנייה ${ver || '?'}\n  להמשך:  git add www && git commit -m "sync www build ${ver || ''}" && git push`);

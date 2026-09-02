@@ -221,13 +221,12 @@
         <h3>גודל טקסט</h3>
         <div class="size-row" id="sizeRow"></div>
       </div>
-      <div class="settings-ver">מחשבון גימטריא · גרסה <span id="appVersion">—</span></div>
       <!-- כתובת מוחלטת בכוונה: הקישור נצרב גם לתוך ה-APK, ושם נתיב יחסי אינו קיים -->
       <div class="settings-dl">להורדת קובץ התקנה במכשירים ללא דפדפן <a href="https://gematria.lishkod.app/apk" download="מחשבון-גימטריא.apk">לחצו כאן</a></div>
       <details class="changelog">
-        <!-- הערה: לעדכן את "גרסה N.N.N" יחד עם APP_VERSION (ui.js) ו-CACHE (sw.js) בכל פיצ'ר חדש.
-             הגרסה כאן היא שמפעילה את באנר "מה חדש" — לכן מעדכנים אותה רק כשיש תוכן חדש למשתמש. -->
-        <summary>היסטוריית גרסאות <span class="cl-latest">· גרסה 1.0.33 · עודכן א' באב תשפ"ו</span></summary>
+        <!-- הערה: "גרסה N.N.N" כאן היא הגרסה שהמשתמש רואה, והיא שמפעילה את באנר "מה חדש" —
+             לכן מעדכנים אותה רק כשיש פיצ'ר/תוכן חדש. בפריסת תיקונים מעלים רק את CACHE ב-sw.js. -->
+        <summary>היסטוריית גרסאות <span class="cl-latest">· גרסה 1.0.33 · עודכן א' באב תשפ"ו</span><span id="clBuild" class="cl-build"></span></summary>
         <div class="cl-body">
           <div class="cl-ver">
             <p class="cl-date">א' באב תשפ"ו</p>

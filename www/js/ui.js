@@ -1,7 +1,6 @@
 /* ui.js — קישור הממשק למנוע */
 (function () {
   'use strict';
-  const APP_VERSION = '1.0.34';   // לעדכן יחד עם גרסת ה-service worker
   const G = window.Gem, S = window.GemSearch;
   const $ = id => document.getElementById(id);
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -655,6 +654,17 @@
     document.querySelectorAll('#sizeRow .size-opt').forEach(b => b.classList.toggle('active', parseFloat(b.dataset.v) === currentScale()));
   }
 
+  // מספר ה-build לצד גרסת התוכן — לאבחון תקלות. נקרא מ-sw.js במקום מקבוע נפרד, כדי
+  // שיהיה מקור-אמת יחיד: sw.js ממילא מועלה בכל פריסה, ולכן המספר לא יכול להישאר מאחור
+  // ולשקר. עובד גם ב-APK (sw.js צרוב בתוכו) ובאופליין (הקובץ בקאש).
+  function showBuild() {
+    const el = $('clBuild'); if (!el) return;
+    fetch('sw.js', { cache: 'no-cache' })
+      .then(r => r.text())
+      .then(t => { const m = t.match(/gematria-v(\d+)/); if (m) el.textContent = '· גרסת בנייה ' + m[1]; })
+      .catch(() => {});
+  }
+
   function openSettings() { buildSettings(); $('settingsOverlay').hidden = false; }
   function closeSettings() { $('settingsOverlay').hidden = true; }
 
@@ -740,7 +750,6 @@
   // ---- אתחול ----
   function init() {
     // מספר גרסה במסך ההגדרות
-    if ($('appVersion')) $('appVersion').textContent = APP_VERSION;
 
     // מילוי בורר סוגי צורניים
     const sel = $('figType');
@@ -782,6 +791,7 @@
     }
     const tab = (location.hash || '').replace('#', '');
     if (['values','ops','primes','figurate','series','search'].includes(tab)) switchTab(tab);
+    showBuild();      // מספר ה-build בשורת היסטוריית הגרסאות
     initWhatsNew();   // באנר "מה חדש" — פעם אחת לכל גרסה (לא למשתמש חדש)
   }
   document.addEventListener('DOMContentLoaded', init);
