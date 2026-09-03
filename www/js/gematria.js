@@ -160,21 +160,31 @@
 
   // ---- מילוי (שמי) ----------------------------------------------------------
   // טבלת מילוי ברירת-מחדל (ניתן להרחיב לווריאנטים).
+  // איות מלא של כל אות. פ/צ/ת קבועים (פא/צדיק/תיו לפי הכרעת הרב).
+  // ה ו-ו משתנים לפי בחירת המשתמש — ראה MILUI_VARIANTS ו-miluiTable.
   const MILUI = {
     א: 'אלף', ב: 'בית', ג: 'גימל', ד: 'דלת', ה: 'הא', ו: 'וו', ז: 'זין',
     ח: 'חית', ט: 'טית', י: 'יוד', כ: 'כף', ל: 'למד', מ: 'מם', נ: 'נון',
-    ס: 'סמך', ע: 'עין', פ: 'פה', צ: 'צדי', ק: 'קוף', ר: 'ריש', ש: 'שין', ת: 'תו',
+    ס: 'סמך', ע: 'עין', פ: 'פא', צ: 'צדיק', ק: 'קוף', ר: 'ריש', ש: 'שין', ת: 'תיו',
   };
-  function milui(text) {
-    const s = onlyLetters(text);
-    let total = 0;
-    for (const ch of s) {
-      const base = FINAL_TO_BASE[ch] || ch;
-      const name = MILUI[base];
-      if (name) total += hechrechi(name);
-    }
-    return total;
+  // הצורות האפשריות ל-ה ו-ו (הראשונה = ברירת המחדל, תואמת את דוגמת "קשה" 552/882/1839).
+  const MILUI_VARIANTS = { ה: ['הא', 'הה', 'הי'], ו: ['וו', 'ויו', 'ואו'] };
+
+  // בונה טבלת מילוי לפי בחירת ה/ו. opts = {he:'הא', vav:'וו'} (חלקי מותר).
+  function miluiTable(opts) {
+    opts = opts || {};
+    return { ...MILUI, ה: opts.he || MILUI.ה, ו: opts.vav || MILUI.ו };
   }
+  // מחזיר את מחרוזת איות המילוי (השמות משורשרים) — הבסיס למילוי-המילוי.
+  function miluiSpell(text, opts) {
+    const t = miluiTable(opts);
+    return [...onlyLetters(text)].map(ch => t[FINAL_TO_BASE[ch] || ch] || '').join('');
+  }
+  function milui(text, opts) { return hechrechi(miluiSpell(text, opts)); }
+  // מילוי המילוי: מאייתים את איות המילוי פעם נוספת.
+  function miluiMilui(text, opts) { return hechrechi(miluiSpell(miluiSpell(text, opts), opts)); }
+  // ביחד: המילה ﬩ מילוי ﬩ מילוי-המילוי (שלוש שכבות, כמו 405﬩552﬩882=1839).
+  function miluiTogether(text, opts) { return hechrechi(text) + milui(text, opts) + miluiMilui(text, opts); }
 
   // ---- פעולות "הכפל" --------------------------------------------------------
   // הכאה: מכפלת כל האותיות של מילה (BigInt — מכפלות של פסוקים חורגות מדיוק Number;
@@ -511,7 +521,8 @@
 
   // ---- ייצוא ----------------------------------------------------------------
   const API = {
-    LETTER, BASE, FINAL_GADOL, FINAL_TO_BASE, ORDER, MILUI, FIGURATE, PHI,
+    LETTER, BASE, FINAL_GADOL, FINAL_TO_BASE, ORDER, MILUI, MILUI_VARIANTS, FIGURATE, PHI,
+    miluiTable, miluiSpell, miluiMilui, miluiTogether,
     onlyLetters, words, stripNotation, letterValue, digitalRoot, digitSum, letterCount, wordCount,
     hechrechi, siduri, katan, kidmi,
     katanMispari, katanMispariAcharon, katanMispariSheni,

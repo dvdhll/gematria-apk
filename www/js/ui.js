@@ -14,7 +14,9 @@
     { key: 'katanMispari', name: 'קטן מספרי', desc: 'כל מילה מצומצמת לספרה', fn: t => G.katanMispari(t) },
     { key: 'katanAcharon', name: 'קטן מספרי אחרון', desc: 'צמצום לספרה בודדת', fn: t => G.katanMispariAcharon(t) },
     { key: 'gadol',     name: 'גדול', desc: 'סופיות 500–900', fn: t => G.hechrechi(t, { sofit: true }) },
-    { key: 'milui',     name: 'מילוי (שמי)', desc: 'איות שם כל אות', fn: t => G.milui(t) },
+    { key: 'milui',     name: 'מילוי (שמי)', desc: 'איות שם כל אות', miluiFam: true, fn: t => G.milui(t, miluiOpts) },
+    { key: 'miluiMilui', name: 'מילוי המילוי', desc: 'איות שם האותיות של המילוי', miluiFam: true, fn: t => G.miluiMilui(t, miluiOpts) },
+    { key: 'miluiTogether', name: 'מילוי ומילוי המילוי', desc: 'מילה ﬩ מילוי ﬩ מילוי המילוי', miluiFam: true, fn: t => G.miluiTogether(t, miluiOpts) },
     { key: 'imHakolel', name: 'עם הכולל', desc: 'הכרחי <span class="plus">﬩</span> 1', fn: t => G.imHakolel(t) },
     { key: 'mosaf',     name: 'מוסף', desc: 'הכרחי <span class="plus">﬩</span> מספר האותיות', fn: t => G.mosaf(t) },
     { key: 'merubaKlali', name: 'מרובע כללי', desc: 'הערך בריבוע', fn: t => G.merubaKlali(t) },
@@ -30,6 +32,20 @@
   let currentNum = 0;
   let currentExpr = null;    // {tokens} כשהקלט הוא ביטוי חשבוני, אחרת null
   let currentResult = null;  // תוצאת הביטוי בערך הכרחי (יכול להיות שבור/שלילי)
+
+  // בחירת צורת המילוי ל-ה ו-ו (השאר קבוע). ברירת מחדל הא+וו = דוגמת "קשה" (552/882/1839).
+  let miluiOpts = { he: 'הא', vav: 'וו' };
+  try {
+    const saved = JSON.parse(localStorage.getItem('gemMilui') || 'null');
+    if (saved && G.MILUI_VARIANTS.ה.includes(saved.he) && G.MILUI_VARIANTS.ו.includes(saved.vav)) miluiOpts = saved;
+  } catch (_) {}
+  let openMethod = null;   // הכרטיס שהפירוט שלו פתוח כרגע (לרענון אחרי שינוי בורר)
+  function setMiluiOpt(kind, val) {
+    if (kind === 'he') miluiOpts.he = val; else miluiOpts.vav = val;
+    try { localStorage.setItem('gemMilui', JSON.stringify(miluiOpts)); } catch (_) {}
+    renderValues(G.onlyLetters(currentText));               // כל כרטיסי המילוי מתעדכנים
+    if (openMethod && openMethod.miluiFam) showBreakdown(openMethod);  // גם הפירוט הפתוח
+  }
 
   // ערך של שיטה עבור הקלט הנוכחי — דרך הביטוי אם יש, אחרת ישירות על הטקסט.
   // plain=true (שיטות ספירה) → תמיד על הטקסט המלא, בלי להחיל את הפעולה.
@@ -90,6 +106,7 @@
     renderPrimes();
     renderFigurate();
     renderSeries();
+    const sh = $('shareBtn'); if (sh) sh.hidden = !(currentText.trim() || currentNum);
     // עדכון ברירת מחדל לחיפוש + ריצה מחדש אם טאב החיפוש פתוח (הצבה תכנותית לא יורה input!)
     $('searchValue').value = currentNum;
     if (S.ready && !$('tab-search').hidden) runSearch();
@@ -178,6 +195,9 @@
         (canSearch ? `<div class="search-link"><button class="chip" onclick="GemUI.searchFor(${value},'hechrechi')">🔍 מצא בתנ״ך מילים/פסוקים ששווים ${value}</button></div>` : '');
       return;
     }
+    openMethod = m;
+    // משפחת המילוי: בוררי ה/ו + פירוט לפי השיטה
+    if (m.miluiFam) { showMiluiBreakdown(m); return; }
     const value = m.fn(currentText);
     let rows = '';
     // פירוט אות-אות עבור השיטות הישירות
@@ -193,15 +213,51 @@
     } else if (m.key === 'merubaPrati') {
       const parts = [...G.onlyLetters(currentText)].map(ch => { const x=G.letterValue(ch,'hechrechi'); return `${x}²`; });
       rows = `<div class="sub">${parts.join(' <span class="plus">﬩</span> ')} = <b class="hl">${value}</b></div>`;
-    } else if (m.key === 'milui') {
-      const chips = [...G.onlyLetters(currentText)].map(ch => {
-        const base = G.FINAL_TO_BASE[ch] || ch; const name = G.MILUI[base] || ch;
-        return `<div class="letter-chip"><span class="l">${name}</span><span class="v">${G.hechrechi(name)}</span></div>`;
-      }).join('');
-      rows = `<div class="letters-row">${chips}</div>`;
     }
     b.innerHTML = `<h4>${m.name}: <span class="hl">${value}</span></h4>${rows}
       <div class="search-link"><button class="chip" onclick="GemUI.searchFor(${value},'${m.key==='siduri'?'siduri':m.key==='katan'?'katan':m.key==='kidmi'?'kidmi':'hechrechi'}')">🔍 מצא בתנ״ך מילים/פסוקים ששווים ${value}</button></div>`;
+  }
+
+  // פירוט משפחת המילוי: בוררי ה/ו למעלה, ואז פירוט לפי השיטה.
+  function showMiluiBreakdown(m) {
+    const b = $('breakdown');
+    const value = m.fn(currentText);
+    const letters = G.onlyLetters(currentText);
+    // בוררי צורת ה/ו
+    const seg = (kind, active) => `<div class="milui-seg" data-kind="${kind}">` +
+      G.MILUI_VARIANTS[kind === 'he' ? 'ה' : 'ו'].map(v =>
+        `<button class="${v === active ? 'on' : ''}" data-val="${v}">${v}</button>`).join('') + `</div>`;
+    const picker = `<div class="milui-pickers">
+      <span class="milui-plabel">מילוי ה־</span>${seg('he', miluiOpts.he)}
+      <span class="milui-plabel">מילוי ו־</span>${seg('vav', miluiOpts.vav)}</div>`;
+
+    let rows = '';
+    if (m.key === 'milui') {
+      // צ׳יפ לכל אות: השם המלא + ערכו
+      const chips = [...letters].map(ch => {
+        const name = G.miluiTable(miluiOpts)[G.FINAL_TO_BASE[ch] || ch] || ch;
+        return `<div class="letter-chip"><span class="l">${name}</span><span class="v">${G.hechrechi(name)}</span></div>`;
+      }).join('');
+      rows = `<div class="letters-row">${chips}</div>`;
+    } else if (m.key === 'miluiMilui') {
+      // שכבה 1 → שכבה 2
+      const s1 = G.miluiSpell(currentText, miluiOpts);
+      const chips = [...s1].map(ch => {
+        const name = G.miluiTable(miluiOpts)[G.FINAL_TO_BASE[ch] || ch] || ch;
+        return `<div class="letter-chip"><span class="l">${name}</span><span class="v">${G.hechrechi(name)}</span></div>`;
+      }).join('');
+      rows = `<div class="sub" style="margin-bottom:6px">איות המילוי: <b class="hl" dir="rtl">${s1}</b> (${G.milui(currentText, miluiOpts)})</div>
+              <div class="letters-row">${chips}</div>`;
+    } else { // miluiTogether
+      const a = G.hechrechi(currentText), b1 = G.milui(currentText, miluiOpts), c = G.miluiMilui(currentText, miluiOpts);
+      rows = `<div class="sub math">${a} <span class="plus">﬩</span> ${b1} <span class="plus">﬩</span> ${c} = <b class="hl">${value}</b></div>
+              <div class="eq-note">המילה ﬩ מילוי ﬩ מילוי המילוי</div>`;
+    }
+    const canSearch = Number.isInteger(value) && value >= 2 && value <= 500000;
+    b.innerHTML = `<h4>${m.name}: <span class="hl">${fmtNum(value)}</span></h4>${picker}${rows}` +
+      (canSearch ? `<div class="search-link"><button class="chip" onclick="GemUI.searchFor(${value},'hechrechi')">🔍 מצא בתנ״ך מילים/פסוקים ששווים ${value}</button></div>` : '');
+    b.querySelectorAll('.milui-seg button').forEach(btn =>
+      btn.onclick = () => setMiluiOpt(btn.parentElement.dataset.kind, btn.dataset.val));
   }
 
   // ---- פעולות ----
@@ -576,7 +632,8 @@
       $('searchMethod').value = method;
       switchTab('search');
       if (!S.ready) initSearch(); else runSearch();
-    }
+    },
+    renderShareCard   // חשוף לבדיקה/שיתוף
   };
 
   // ---- טאבים ----
@@ -663,6 +720,206 @@
       .then(r => r.text())
       .then(t => { const m = t.match(/gematria-v(\d+)/); if (m) el.textContent = '· גרסת בנייה ' + m[1]; })
       .catch(() => {});
+  }
+
+  // ---- שיתוף — לפי הטאב הפעיל, עם קישור שטוען את אותו ערך ----------------------
+  // הקישור מצביע תמיד לאתר הציבורי (ב-APK/median ה-origin אינו gematria.lishkod.app).
+  const SHARE_BASE = 'https://gematria.lishkod.app/';
+  function activeTabName() { const b = document.querySelector('.tabs button.active'); return b ? b.dataset.tab : 'values'; }
+
+  // המרת ערך מרשימת הרב (HTML) לטקסט וואטסאפ: <b>→*, וניקוי הערות-עבודה ???…???.
+  // הרווחים מוצאים אל מחוץ לכוכביות כי וואטסאפ לא מדגיש כשיש רווח צמוד לכוכבית.
+  function htmlToWA(html) {
+    return String(html)
+      .replace(/<b>(\s*)([\s\S]*?)(\s*)<\/b>/gi, (m, a, core, b) => core.trim() ? a + '*' + core.trim() + '*' + b : a + b)
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s*\?{2,}[^?]*\?{2,}\s*/g, ' ')      // ניקוי אוטומטי של הערות-עבודה (רשת ביטחון חלקית)
+      .replace(/\s+/g, ' ').trim();
+  }
+  function ravListText(n) {
+    const e = (VALUES_LIST && VALUES_LIST[n]) || [];
+    return e.map(x => '• ' + htmlToWA(x)).filter(s => s.length > 2).join('\n');
+  }
+
+  function shareText() {
+    const tab = activeTabName(), w = currentText.trim();
+    if (!w && !currentNum) return '';
+    if (currentExpr) return `${w} = ${fmtNum(currentResult)}`;              // ביטוי חשבוני
+    const hasLetters = !!G.onlyLetters(w);
+    if (tab === 'values' && hasLetters) {
+      const rav = ravListText(currentNum);                                 // רשימת הערכים של הרב, אם יש
+      if (rav) return `✦ ${w} = ${G.hechrechi(w)}\n\n${rav}`;
+      return `${w} — הכרחי ${G.hechrechi(w)}, סידורי ${G.siduri(w)}, קטן ${G.katan(w)}, מילוי ${G.milui(w, miluiOpts)}`;
+    }
+    if (tab === 'primes' && Number.isInteger(currentNum) && currentNum >= 2) {
+      const f = G.factorize(currentNum);
+      return `${currentNum} = ${f.map(x => x.p + (x.k > 1 ? '^' + x.k : '')).join(' × ')}`;
+    }
+    return hasLetters ? `${w} = ${currentNum}` : (w || String(currentNum));   // שאר הטאבים: ערך + קישור
+  }
+
+  function shareUrl() {
+    const tab = activeTabName(), u = new URL(SHARE_BASE);
+    if (currentText.trim()) u.searchParams.set('q', currentText);   // set() מקודד ﬩/+ כראוי
+    if (tab === 'search') u.searchParams.set('s', searchScope);
+    u.hash = tab;
+    return u.toString();
+  }
+
+  function shareToast(msg) {
+    let t = $('shareToast');
+    if (!t) { t = el('div'); t.id = 'shareToast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // dataURL → File, סינכרוני (שומר על user-activation לקריאת navigator.share ב-iOS)
+  function dataURLtoFile(dataURL, name) {
+    const [head, b64] = dataURL.split(',');
+    const mime = (head.match(/:(.*?);/) || [])[1] || 'image/png';
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new File([u8], name, { type: mime });
+  }
+
+  async function shareCurrent() {
+    const text = shareText(), url = shareUrl();
+    let file = null;
+    try { const cv = await renderShareCard(); file = dataURLtoFile(cv.toDataURL('image/png'), 'gematria.png'); } catch (_) {}
+    // 1) שיתוף עם תמונה (נייד/median)
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], text, url, title: 'מחשבון גימטריא' }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    // 2) שיתוף טקסט+קישור בלבד
+    if (navigator.share) {
+      try { await navigator.share({ title: 'מחשבון גימטריא', text, url }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    // 3) גיבוי (דסקטופ): הורדת התמונה + העתקת הטקסט+קישור
+    if (file) {
+      try { const a = el('a'); a.href = URL.createObjectURL(file); a.download = 'gematria.png';
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); } catch (_) {}
+    }
+    const payload = text ? `${text}\n${url}` : url;
+    const sh = $('shareBtn'); if (sh) { sh.classList.add('done'); setTimeout(() => sh.classList.remove('done'), 1200); }
+    try { await navigator.clipboard.writeText(payload); shareToast(file ? 'התמונה ירדה · הטקסט הועתק ✓' : 'הועתק ✓'); }
+    catch (_) { shareToast(file ? 'התמונה ירדה' : ('הקישור: ' + url)); }
+  }
+
+  // ---- כרטיס שיתוף מעוצב (canvas → PNG) --------------------------------------
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  // מקטין גופן עד שהטקסט נכנס לרוחב
+  function fitFont(ctx, text, weight, family, size, maxW) {
+    do { ctx.font = `${weight} ${size}px ${family}`; if (ctx.measureText(text).width <= maxW) break; size -= 4; } while (size > 20);
+    return size;
+  }
+
+  async function renderShareCard() {
+    const cs = getComputedStyle(document.documentElement);
+    const col = (n, d) => (cs.getPropertyValue(n).trim() || d);
+    const C = {
+      bg: col('--bg', '#0d0b07'), card: col('--card', '#1f1a11'), accent: col('--accent', '#e3bd57'),
+      ink: col('--text', '#fbf7ee'), muted: col('--muted', '#d2c6a6'), line: col('--border', '#f5e6c026'),
+      tanakh: (cs.getPropertyValue('--font-tanakh').trim() || "'Keter YG'"), UI: "'Assistant'",
+    };
+    try { await Promise.all([document.fonts.load(`700 120px ${C.tanakh}`), document.fonts.load(`800 48px ${C.UI}`)]); await document.fonts.ready; } catch (_) {}
+
+    const tab = activeTabName(), w = currentText.trim();
+    // כרטיס ערכי-המילה = מקיף: המילה + כל שיטות הגימטריא. שאר הטאבים = כרטיס מרוכז 1080².
+    const full = (tab === 'values' && !currentExpr && !!G.onlyLetters(w));
+    const S = 1080, H = full ? 1350 : 1080, pad = 64, cx = S / 2, maxW = S - 2 * pad - 90;
+    const cv = document.createElement('canvas'); cv.width = S; cv.height = H;
+    const ctx = cv.getContext('2d');
+
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, S, H);
+    roundRectPath(ctx, pad, pad, S - 2 * pad, H - 2 * pad, 44);
+    ctx.fillStyle = C.card; ctx.fill(); ctx.strokeStyle = C.line; ctx.lineWidth = 2; ctx.stroke();
+    ctx.textAlign = 'center'; ctx.direction = 'rtl'; ctx.textBaseline = 'alphabetic';
+
+    ctx.fillStyle = C.accent; ctx.font = `800 40px ${C.UI}`;
+    ctx.fillText('מחשבון גימטריא ✦', cx, pad + 96);
+    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(pad + 60, pad + 132); ctx.lineTo(S - pad - 60, pad + 132); ctx.stroke();
+
+    const big = (t, y, colr, fam, wght, size) => { fitFont(ctx, t, wght, fam, size, maxW); ctx.fillStyle = colr; ctx.fillText(t, cx, y); };
+
+    if (full) {
+      drawFullValues(ctx, cx, pad, S, C);
+    } else if (tab === 'figurate' && Number.isInteger(currentNum) && currentNum >= 1) {
+      drawFigCard(ctx, cx, pad, S, C.accent, C.ink, C.muted, C.line, C.tanakh, C.UI, maxW);
+    } else if (currentExpr) {
+      big(w, 430, C.ink, C.tanakh, 700, 108);
+      ctx.fillStyle = C.muted; ctx.font = `600 40px ${C.UI}`; ctx.fillText('תוצאה', cx, 560);
+      big(fmtNum(currentResult) + '', 700, C.accent, C.UI, 800, 168);
+    } else if (tab === 'primes' && Number.isInteger(currentNum) && currentNum >= 2) {
+      big(String(currentNum), 460, C.ink, C.tanakh, 700, 150);
+      const f = G.factorize(currentNum);
+      const fac = f.map(x => x.p + (x.k > 1 ? '^' + x.k : '')).join(' × ');
+      ctx.fillStyle = C.muted; ctx.font = `600 40px ${C.UI}`; ctx.fillText('פירוק לגורמים ראשוניים', cx, 590);
+      ctx.direction = 'ltr'; big(fac, 700, C.accent, C.UI, 800, 120); ctx.direction = 'rtl';
+    } else {
+      big(w || String(currentNum), 480, C.ink, C.tanakh, 700, 130);
+      big(String(currentNum), 700, C.accent, C.UI, 800, 190);
+    }
+
+    ctx.fillStyle = C.accent; ctx.font = `700 34px ${C.UI}`; ctx.direction = 'ltr'; ctx.textAlign = 'center';
+    ctx.fillText('gematria.lishkod.app', cx, H - pad - 54);
+    ctx.direction = 'rtl';
+    return cv;
+  }
+
+  // כרטיס ערכי-מילה מקיף: המילה, ההכרחי, ואז כל השיטות בשתי עמודות.
+  const SHARE_SHORT = { 'מילוי (שמי)': 'מילוי',
+    'קטן מספרי אחרון': 'קטן אחרון', 'מספר אותיות': 'אותיות', 'מספר מילים': 'מילים' };
+  function drawFullValues(ctx, cx, pad, S, C) {
+    const w = currentText.trim(), maxW = S - 2 * pad - 90;
+    fitFont(ctx, w, 700, C.tanakh, 130, maxW); ctx.fillStyle = C.ink; ctx.fillText(w, cx, pad + 268);
+    fitFont(ctx, String(G.hechrechi(w)), 800, C.UI, 130, maxW); ctx.fillStyle = C.accent; ctx.fillText(String(G.hechrechi(w)), cx, pad + 440);
+    ctx.fillStyle = C.muted; ctx.font = `600 34px ${C.UI}`; ctx.fillText('ערך הכרחי', cx, pad + 490);
+    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(pad + 60, pad + 540); ctx.lineTo(S - pad - 60, pad + 540); ctx.stroke();
+
+    const items = METHODS.filter(m => m.key !== 'hechrechi').map(m => ({ name: SHARE_SHORT[m.name] || m.name, v: m.fn(currentText) }));
+    const half = Math.ceil(items.length / 2), y0 = pad + 616, step = 64;
+    const innerL = pad + 60, innerR = S - pad - 60;
+    const geo = [{ nameX: innerR, valX: cx + 24 }, { nameX: cx - 24, valX: innerL }];   // ימין, שמאל
+    items.forEach((it, i) => {
+      const g = geo[i < half ? 0 : 1], y = y0 + (i % half) * step;
+      ctx.direction = 'rtl'; ctx.textAlign = 'right';
+      fitFont(ctx, it.name, 600, C.UI, 33, 220); ctx.fillStyle = C.ink; ctx.fillText(it.name, g.nameX, y);
+      ctx.direction = 'ltr'; ctx.textAlign = 'left';
+      fitFont(ctx, String(fmtNum(it.v)), 700, C.UI, 33, 150); ctx.fillStyle = C.accent; ctx.fillText(String(fmtNum(it.v)), g.valX, y);
+    });
+    ctx.direction = 'rtl'; ctx.textAlign = 'center';
+  }
+
+  // כרטיס לטאב הצורניים — מצייר את הצורה עצמה בנקודות
+  function drawFigCard(ctx, cx, pad, S, accent, ink, muted, line, tanakh, UI, maxW) {
+    const n = currentNum;
+    const hits = G.identifyFigurate(n);
+    ctx.fillStyle = ink; ctx.font = `700 120px ${tanakh}`; ctx.fillText(String(n), cx, pad + 260);
+    if (!hits.length) {
+      ctx.fillStyle = muted; ctx.font = `600 40px ${UI}`; ctx.fillText('אינו מספר צורני', cx, pad + 340); return;
+    }
+    const h = hits[0], rows = figRows(h.type, h.index);
+    ctx.fillStyle = muted; ctx.font = `600 42px ${UI}`;
+    ctx.fillText(`${G.FIGURATE[h.type].he} ה-${h.index}`, cx, pad + 340);
+    if (!rows) return;
+    // ציור נקודות ממורכזות
+    const areaY = pad + 400, areaH = S - pad - 140 - areaY, maxCols = Math.max(...rows);
+    const gap = Math.min(46, Math.floor((maxW) / (maxCols + 1)), Math.floor(areaH / (rows.length + 1)));
+    const r = Math.max(5, Math.floor(gap * 0.32));
+    const totalH = (rows.length - 1) * gap;
+    let y = areaY + (areaH - totalH) / 2;
+    ctx.fillStyle = accent;
+    rows.forEach(cols => {
+      const rowW = (cols - 1) * gap, x0 = cx - rowW / 2;
+      for (let i = 0; i < cols; i++) { ctx.beginPath(); ctx.arc(x0 + i * gap, y, r, 0, 7); ctx.fill(); }
+      y += gap;
+    });
   }
 
   function openSettings() { buildSettings(); $('settingsOverlay').hidden = false; }
@@ -763,6 +1020,7 @@
 
     $('mainInput').addEventListener('input', () => { heifyPlus($('mainInput')); refresh(); });
     if ($('clearInput')) $('clearInput').addEventListener('click', () => { $('mainInput').value = ''; refresh(); $('mainInput').focus(); });
+    if ($('shareBtn')) $('shareBtn').addEventListener('click', shareCurrent);
     $('opA').addEventListener('input', renderHakaahPratit);
     $('opB').addEventListener('input', renderHakaahPratit);
     $('figType').addEventListener('change', renderFigGen);
@@ -784,6 +1042,9 @@
     refresh();
     if (params.get('v')) $('searchValue').value = params.get('v'); // אחרי refresh, שלא יידרס
     loadValuesList();
+    // חימום פונטים לכרטיס השיתוף — כדי שהרינדור בזמן לחיצה יהיה מיידי (שומר user-activation)
+    try { const tf = getComputedStyle(document.documentElement).getPropertyValue('--font-tanakh').trim() || "'Keter YG'";
+      document.fonts.load(`700 120px ${tf}`); document.fonts.load(`800 48px 'Assistant'`); } catch (_) {}
     const sc = params.get('s');
     if (['words','phrases','verses'].includes(sc)) {
       searchScope = sc;

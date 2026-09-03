@@ -371,6 +371,23 @@ select option:checked{background:var(--gold-soft)}
 .scope-toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .scope-toggle button{border:none;background:var(--card);padding:7px 16px;font-family:inherit;cursor:pointer;color:var(--muted)}
 .scope-toggle button.active{background:var(--gold);color:var(--on-accent);font-weight:700}
+/* בוררי צורת המילוי (ה/ו) בחלון המילוי */
+.milui-pickers{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:2px 0 12px}
+.milui-plabel{font-size:.82rem;color:var(--muted)}
+.milui-seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.milui-seg button{border:none;background:var(--card);padding:4px 12px;font-family:inherit;font-size:.9rem;cursor:pointer;color:var(--muted)}
+.milui-seg button.on{background:var(--gold);color:var(--on-accent);font-weight:700}
+/* כפתור שיתוף — מודע לטאב הפעיל */
+.share-btn{display:inline-flex;align-items:center;gap:6px;margin:10px auto 2px;padding:6px 16px;
+  border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--gold);
+  font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer}
+.share-btn:active{transform:scale(.97)}
+.share-btn.done{color:var(--ok);border-color:var(--ok)}
+/* toast קצר להעתקה-ללוח (גיבוי כשאין תפריט שיתוף) */
+#shareToast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:12px;
+  padding:10px 18px;font-size:.9rem;box-shadow:var(--shadow);z-index:4000;opacity:0;transition:opacity .2s;pointer-events:none}
+#shareToast.show{opacity:1}
 .search-status{margin:12px 2px;color:var(--muted);font-size:.9rem}
 .search-results{display:flex;flex-direction:column;gap:8px}
 .res-word{display:inline-block;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px;margin:3px;font-size:1.15rem;font-weight:700;color:var(--navy);cursor:pointer}

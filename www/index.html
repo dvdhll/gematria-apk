@@ -74,6 +74,10 @@
         <button id="clearInput" class="sb-clear" type="button" aria-label="ניקוי וכתיבה מחדש">✕</button>
       </div>
       <div class="headline" id="headline"></div>
+      <button id="shareBtn" class="share-btn" type="button" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 1 0-3-3c0 .24.04.47.09.7L8.04 9.81A3 3 0 0 0 3 12a3 3 0 0 0 5.04 2.19l7.12 4.16c-.05.21-.08.43-.08.65a2.92 2.92 0 1 0 2.92-2.92z"/></svg>
+        <span>שיתוף</span>
+      </button>
     </section>
 
     <!-- ניווט -->
@@ -226,8 +230,15 @@
       <details class="changelog">
         <!-- הערה: "גרסה N.N.N" כאן היא הגרסה שהמשתמש רואה, והיא שמפעילה את באנר "מה חדש" —
              לכן מעדכנים אותה רק כשיש פיצ'ר/תוכן חדש. בפריסת תיקונים מעלים רק את CACHE ב-sw.js. -->
-        <summary>היסטוריית גרסאות <span class="cl-latest">· גרסה 1.0.33 · עודכן א' באב תשפ"ו</span><span id="clBuild" class="cl-build"></span></summary>
+        <summary>היסטוריית גרסאות <span class="cl-latest">· גרסה 1.0.35 · עודכן כ' באלול תשפ"ו</span><span id="clBuild" class="cl-build"></span></summary>
         <div class="cl-body">
+          <div class="cl-ver">
+            <p class="cl-date">כ' באלול תשפ"ו</p>
+            <ul class="cl-list">
+              <li>כפתור שיתוף: יוצר כרטיס תמונה מעוצב לפי המסך שבו אתם נמצאים (ערכי המילה, פעולה, פירוק, או צורה), עם רשימת הערכים הנלווית וקישור שפותח את האפליקציה עם אותו ערך כבר מוכן</li>
+              <li>מילוי המילוי: נוספו שתי שכבות מילוי — "מילוי המילוי" ו"מילוי ומילוי המילוי" (הכל ביחד). בחלון המילוי אפשר לבחור את צורת האיות של האותיות ה' ו-ו' (הא/הה/הי · וו/ויו/ואו)</li>
+            </ul>
+          </div>
           <div class="cl-ver">
             <p class="cl-date">א' באב תשפ"ו</p>
             <ul class="cl-list">
