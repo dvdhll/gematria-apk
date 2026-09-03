@@ -633,7 +633,7 @@
       switchTab('search');
       if (!S.ready) initSearch(); else runSearch();
     },
-    renderShareCard   // חשוף לבדיקה/שיתוף
+    renderShareCard, shareText, shareUrl   // חשוף לבדיקה/שיתוף
   };
 
   // ---- טאבים ----
@@ -744,13 +744,15 @@
   function shareText() {
     const tab = activeTabName(), w = currentText.trim();
     if (!w && !currentNum) return '';
-    if (currentExpr) return `${w} = ${fmtNum(currentResult)}`;              // ביטוי חשבוני
     const hasLetters = !!G.onlyLetters(w);
+    // טאב הערכים + יש אותיות (מילה בודדת או ביטוי־מילים כמו "דוד ﬩ הלל") → ערך הכרחי + רשימת הרב.
     if (tab === 'values' && hasLetters) {
-      const rav = ravListText(currentNum);                                 // רשימת הערכים של הרב, אם יש
-      if (rav) return `✦ ${w} = ${G.hechrechi(w)}\n\n${rav}`;
-      return `${w} — הכרחי ${G.hechrechi(w)}, סידורי ${G.siduri(w)}, קטן ${G.katan(w)}, מילוי ${G.milui(w, miluiOpts)}`;
+      const total = methodValue(G.hechrechi);
+      const rav = Number.isInteger(total) ? ravListText(total) : '';       // רשימת הערכים של הרב, אם יש
+      if (rav) return `✦ ${w} = ${fmtNum(total)}\n\n${rav}`;
+      return `${w} — הכרחי ${fmtNum(total)}, סידורי ${fmtNum(methodValue(G.siduri))}, קטן ${fmtNum(methodValue(G.katan))}, מילוי ${fmtNum(methodValue(t => G.milui(t, miluiOpts)))}`;
     }
+    if (currentExpr) return `${w} = ${fmtNum(currentResult)}`;              // ביטוי מספרי (בלי אותיות)
     if (tab === 'primes' && Number.isInteger(currentNum) && currentNum >= 2) {
       const f = G.factorize(currentNum);
       return `${currentNum} = ${f.map(x => x.p + (x.k > 1 ? '^' + x.k : '')).join(' × ')}`;
@@ -758,12 +760,17 @@
     return hasLetters ? `${w} = ${currentNum}` : (w || String(currentNum));   // שאר הטאבים: ערך + קישור
   }
 
+  // קישור קריא: אותיות עבריות נשארות כפי שהן; רק תווים שמורים בכתובת מקודדים.
+  // ﬩ (פלוס עברי) → + רגיל, וה-+ מקודד ל-%2B כדי שלא ייקרא כרווח בעת הטעינה.
+  function encQ(s) {
+    return String(s).replace(/﬩/g, '+')
+      .replace(/[+%&#?\s]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+  }
   function shareUrl() {
-    const tab = activeTabName(), u = new URL(SHARE_BASE);
-    if (currentText.trim()) u.searchParams.set('q', currentText);   // set() מקודד ﬩/+ כראוי
-    if (tab === 'search') u.searchParams.set('s', searchScope);
-    u.hash = tab;
-    return u.toString();
+    const tab = activeTabName(), qs = [];
+    if (currentText.trim()) qs.push('q=' + encQ(currentText.trim()));
+    if (tab === 'search') qs.push('s=' + searchScope);
+    return SHARE_BASE + (qs.length ? '?' + qs.join('&') : '') + '#' + tab;
   }
 
   function shareToast(msg) {
@@ -829,9 +836,10 @@
     };
     try { await Promise.all([document.fonts.load(`700 120px ${C.tanakh}`), document.fonts.load(`800 48px ${C.UI}`)]); await document.fonts.ready; } catch (_) {}
 
-    const tab = activeTabName(), w = currentText.trim();
-    // כרטיס ערכי-המילה = מקיף: המילה + כל שיטות הגימטריא. שאר הטאבים = כרטיס מרוכז 1080².
-    const full = (tab === 'values' && !currentExpr && !!G.onlyLetters(w));
+    const tab = activeTabName(), w = currentText.trim(), hasWord = !!G.onlyLetters(w);
+    // כרטיס ערכי-המילה = מקיף: המילה + כל שיטות הגימטריא (כולל ביטוי־מילים כמו "דוד ﬩ הלל",
+    // שכל שיטה מחושבת עליו). שאר הטאבים = כרטיס מרוכז 1080².
+    const full = (tab === 'values' && hasWord);
     const S = 1080, H = full ? 1350 : 1080, pad = 64, cx = S / 2, maxW = S - 2 * pad - 90;
     const cv = document.createElement('canvas'); cv.width = S; cv.height = H;
     const ctx = cv.getContext('2d');
@@ -856,11 +864,19 @@
       ctx.fillStyle = C.muted; ctx.font = `600 40px ${C.UI}`; ctx.fillText('תוצאה', cx, 560);
       big(fmtNum(currentResult) + '', 700, C.accent, C.UI, 800, 168);
     } else if (tab === 'primes' && Number.isInteger(currentNum) && currentNum >= 2) {
-      big(String(currentNum), 460, C.ink, C.tanakh, 700, 150);
       const f = G.factorize(currentNum);
       const fac = f.map(x => x.p + (x.k > 1 ? '^' + x.k : '')).join(' × ');
-      ctx.fillStyle = C.muted; ctx.font = `600 40px ${C.UI}`; ctx.fillText('פירוק לגורמים ראשוניים', cx, 590);
-      ctx.direction = 'ltr'; big(fac, 700, C.accent, C.UI, 800, 120); ctx.direction = 'rtl';
+      if (hasWord) {                                          // מילה: המילה בראש, ואז הערך ופירוקו
+        big(w, 370, C.ink, C.tanakh, 700, 120);
+        ctx.fillStyle = C.muted; ctx.font = `600 36px ${C.UI}`; ctx.fillText('ערך', cx, 495);
+        big(String(currentNum), 620, C.accent, C.UI, 800, 140);
+        ctx.fillStyle = C.muted; ctx.font = `600 36px ${C.UI}`; ctx.fillText('פירוק לגורמים ראשוניים', cx, 745);
+        ctx.direction = 'ltr'; big(fac, 850, C.ink, C.UI, 700, 96); ctx.direction = 'rtl';
+      } else {
+        big(String(currentNum), 460, C.ink, C.tanakh, 700, 150);
+        ctx.fillStyle = C.muted; ctx.font = `600 40px ${C.UI}`; ctx.fillText('פירוק לגורמים ראשוניים', cx, 590);
+        ctx.direction = 'ltr'; big(fac, 700, C.accent, C.UI, 800, 120); ctx.direction = 'rtl';
+      }
     } else {
       big(w || String(currentNum), 480, C.ink, C.tanakh, 700, 130);
       big(String(currentNum), 700, C.accent, C.UI, 800, 190);
@@ -877,12 +893,13 @@
     'קטן מספרי אחרון': 'קטן אחרון', 'מספר אותיות': 'אותיות', 'מספר מילים': 'מילים' };
   function drawFullValues(ctx, cx, pad, S, C) {
     const w = currentText.trim(), maxW = S - 2 * pad - 90;
+    const total = String(fmtNum(methodValue(G.hechrechi)));           // אם ביטוי — ההכרחי מחושב על הביטוי
     fitFont(ctx, w, 700, C.tanakh, 130, maxW); ctx.fillStyle = C.ink; ctx.fillText(w, cx, pad + 268);
-    fitFont(ctx, String(G.hechrechi(w)), 800, C.UI, 130, maxW); ctx.fillStyle = C.accent; ctx.fillText(String(G.hechrechi(w)), cx, pad + 440);
+    fitFont(ctx, total, 800, C.UI, 130, maxW); ctx.fillStyle = C.accent; ctx.fillText(total, cx, pad + 440);
     ctx.fillStyle = C.muted; ctx.font = `600 34px ${C.UI}`; ctx.fillText('ערך הכרחי', cx, pad + 490);
     ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(pad + 60, pad + 540); ctx.lineTo(S - pad - 60, pad + 540); ctx.stroke();
 
-    const items = METHODS.filter(m => m.key !== 'hechrechi').map(m => ({ name: SHARE_SHORT[m.name] || m.name, v: m.fn(currentText) }));
+    const items = METHODS.filter(m => m.key !== 'hechrechi').map(m => ({ name: SHARE_SHORT[m.name] || m.name, v: methodValue(m.fn, m.count) }));
     const half = Math.ceil(items.length / 2), y0 = pad + 616, step = 64;
     const innerL = pad + 60, innerR = S - pad - 60;
     const geo = [{ nameX: innerR, valX: cx + 24 }, { nameX: cx - 24, valX: innerL }];   // ימין, שמאל
@@ -1038,7 +1055,7 @@
 
     // דיפ-לינק: ?q=טקסט  ו-#tab
     const params = new URLSearchParams(location.search);
-    if (params.get('q')) $('mainInput').value = params.get('q');
+    if (params.get('q')) { $('mainInput').value = params.get('q'); heifyPlus($('mainInput')); }
     refresh();
     if (params.get('v')) $('searchValue').value = params.get('v'); // אחרי refresh, שלא יידרס
     loadValuesList();
