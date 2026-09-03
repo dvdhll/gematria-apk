@@ -1,5 +1,5 @@
 /* service worker — קאשינג לאופליין */
-const CACHE = 'gematria-v38';
+const CACHE = 'gematria-v39';
 const ASSETS = [
   './', './index.html', './css/styles.css',
   './js/gematria.js', './js/search.js', './js/ui.js',

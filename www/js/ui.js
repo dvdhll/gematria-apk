@@ -760,15 +760,21 @@
     return hasLetters ? `${w} = ${currentNum}` : (w || String(currentNum));   // שאר הטאבים: ערך + קישור
   }
 
-  // קישור קריא: אותיות עבריות נשארות כפי שהן; רק תווים שמורים בכתובת מקודדים.
-  // ﬩ (פלוס עברי) → + רגיל, וה-+ מקודד ל-%2B כדי שלא ייקרא כרווח בעת הטעינה.
-  function encQ(s) {
-    return String(s).replace(/﬩/g, '+')
-      .replace(/[+%&#?\s]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+  // קישור קצר ונקי: הערך מקודד ל-base64url (ASCII בלבד, בלי %D7) — כי מנגנון השיתוף
+  // מקדד אותיות עבריות בכתובת ל-%D7, ו-base64url שורד כל מסלול שיתוף ונפתח על אותו ערך.
+  function b64uEnc(s) {
+    let bin = ''; new TextEncoder().encode(s).forEach(b => bin += String.fromCharCode(b));
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64uDec(b) {
+    b = b.replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '=';
+    const bin = atob(b), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(u8);
   }
   function shareUrl() {
     const tab = activeTabName(), qs = [];
-    if (currentText.trim()) qs.push('q=' + encQ(currentText.trim()));
+    if (currentText.trim()) qs.push('g=' + b64uEnc(currentText.trim()));
     if (tab === 'search') qs.push('s=' + searchScope);
     return SHARE_BASE + (qs.length ? '?' + qs.join('&') : '') + '#' + tab;
   }
@@ -1057,7 +1063,10 @@
 
     // דיפ-לינק: ?q=טקסט  ו-#tab
     const params = new URLSearchParams(location.search);
-    if (params.get('q')) { $('mainInput').value = params.get('q'); heifyPlus($('mainInput')); }
+    // g = ערך מקודד base64url (הקישור החדש); q = טקסט גולמי (תאימות לקישורים ישנים)
+    if (params.get('g')) { try { $('mainInput').value = b64uDec(params.get('g')); } catch (_) {} }
+    else if (params.get('q')) { $('mainInput').value = params.get('q'); }
+    heifyPlus($('mainInput'));
     refresh();
     if (params.get('v')) $('searchValue').value = params.get('v'); // אחרי refresh, שלא יידרס
     loadValuesList();
