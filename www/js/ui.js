@@ -791,16 +791,19 @@
 
   async function shareCurrent() {
     const text = shareText(), url = shareUrl();
+    // הקישור משולב בתוך הטקסט (לא בשדה url הנפרד) — שדה url של Web Share מנורמל תמיד ל-%D7,
+    // ואילו טקסט חופשי משמר את האותיות העבריות קריאות (וואטסאפ מזהה ומקשר את ה-URL בתוכו).
+    const payload = text ? `${text}\n\n${url}` : url;
     let file = null;
     try { const cv = await renderShareCard(); file = dataURLtoFile(cv.toDataURL('image/png'), 'gematria.png'); } catch (_) {}
     // 1) שיתוף עם תמונה (נייד/median)
     if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], text, url, title: 'מחשבון גימטריא' }); return; }
+      try { await navigator.share({ files: [file], text: payload, title: 'מחשבון גימטריא' }); return; }
       catch (e) { if (e && e.name === 'AbortError') return; }
     }
     // 2) שיתוף טקסט+קישור בלבד
     if (navigator.share) {
-      try { await navigator.share({ title: 'מחשבון גימטריא', text, url }); return; }
+      try { await navigator.share({ title: 'מחשבון גימטריא', text: payload }); return; }
       catch (e) { if (e && e.name === 'AbortError') return; }
     }
     // 3) גיבוי (דסקטופ): הורדת התמונה + העתקת הטקסט+קישור
@@ -808,7 +811,6 @@
       try { const a = el('a'); a.href = URL.createObjectURL(file); a.download = 'gematria.png';
         document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); } catch (_) {}
     }
-    const payload = text ? `${text}\n${url}` : url;
     const sh = $('shareBtn'); if (sh) { sh.classList.add('done'); setTimeout(() => sh.classList.remove('done'), 1200); }
     try { await navigator.clipboard.writeText(payload); shareToast(file ? 'התמונה ירדה · הטקסט הועתק ✓' : 'הועתק ✓'); }
     catch (_) { shareToast(file ? 'התמונה ירדה' : ('הקישור: ' + url)); }
