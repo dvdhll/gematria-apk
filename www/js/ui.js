@@ -337,7 +337,7 @@
         ? entries.map(e => `<div class="rav-entry">${e}</div>`).join('')
         : `<div class="rav-entry sub" style="color:var(--muted)">אין ערכים למספר ${n} ברשימה.</div>`) +
       nav +
-      `<div class="rav-src">מתוך רשימת הערכים (סיון תשפ"ו)</div>`;
+      `<div class="rav-src">מתוך רשימת הערכים (אלול תשפ"ו)</div>`;
     box.querySelectorAll('.rav-go').forEach(b => b.onclick = () => gotoNum(parseInt(b.dataset.go, 10)));
   }
 
