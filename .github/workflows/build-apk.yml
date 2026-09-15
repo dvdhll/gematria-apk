@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android (APK + AAB)
 on:
   push:
     branches: [ main ]
@@ -12,38 +12,53 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - uses: android-actions/setup-android@v3
+      - name: Install SDK 36 platform + build-tools
+        run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null || true
+
       - run: npm ci
       - run: npx cap add android
       - run: npx @capacitor/assets generate --android --iconBackgroundColor '#9a7520' --iconBackgroundColorDark '#9a7520' --splashBackgroundColor '#0d0b07' --splashBackgroundColorDark '#0d0b07'
       - run: npx cap sync android
-      - name: Build unsigned release APK
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/android/app/release.p12"
+
+      - name: Patch android project (version + signing)
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: node ci/patch-android.mjs
+
+      - name: Build signed AAB + APK
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/android/app/release.p12
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
-      - name: Sign release APK
+          ./gradlew bundleRelease assembleRelease --no-daemon
+
+      - name: Collect outputs
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.p12
-          BT="$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)"
-          U=android/app/build/outputs/apk/release/app-release-unsigned.apk
-          "$BT/zipalign" -f 4 "$U" aligned.apk
-          "$BT/apksigner" sign --ks release.p12 --ks-type PKCS12 \
-            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
-            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
-            --out gematria-release.apk aligned.apk
-          "$BT/apksigner" verify --print-certs gematria-release.apk
-      - uses: actions/upload-artifact@v4
+          echo "--- build outputs ---"
+          find android/app/build/outputs -name "*.aab" -o -name "*.apk" | sort
+          cp android/app/build/outputs/bundle/release/app-release.aab gematria-release.aab
+          cp android/app/build/outputs/apk/release/app-release.apk gematria-release.apk
+
+      - name: Upload AAB (for Google Play)
+        uses: actions/upload-artifact@v4
         with:
-          name: gematria-apk-signed
-          path: gematria-release.apk
+          name: gematria-aab
+          path: gematria-release.aab
           if-no-files-found: error
-      - name: Publish to 'latest' release
+
+      - name: Publish APK to 'latest' release (sideload)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
