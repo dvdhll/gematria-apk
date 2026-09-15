@@ -35,10 +35,11 @@ if (!/signingConfigs\s*\{/.test(s)) {
     }$1buildTypes {`);
 }
 
-// להחיל את החתימה על buildType release (מזריקים אחרי '{' של release)
+// להחיל את החתימה על buildType release בלבד — עוגן על minifyEnabled שקיים רק שם
+// (ולא על ה-release שבתוך signingConfigs).
 if (!/signingConfig\s+signingConfigs\.release/.test(s)) {
-  s = s.replace(/(release\s*\{)/, `$1
-            signingConfig signingConfigs.release`);
+  s = s.replace(/(minifyEnabled\s+\w+)/, `signingConfig signingConfigs.release
+            $1`);
 }
 
 fs.writeFileSync(GRADLE, s);
