@@ -1,7 +1,7 @@
 // מריצים אחרי `npx cap add android` ב-CI. תיקיית android/ מיוצרת מחדש בכל בנייה
 // (היא ב-gitignore), לכן את מספר-הגרסה ואת תצורת החתימה מזריקים כאן ל-build.gradle המיוצר.
-// versionCode חייב לעלות בכל העלאה ל-Play → github.run_number. versionName נגזר מגרסת
-// התוכן של האתר (www/index.html) כדי שלא יישאר מאחור (ראה לקח "לא להשאיר תוויות ישנות").
+// versionCode חייב לעלות בכל העלאה ל-Play → github.run_number.
+// versionName = גרסת האנדרואיד מ-package.json (נפרדת מגרסת התוכן של האתר).
 import fs from 'fs';
 
 const GRADLE = 'android/app/build.gradle';
@@ -11,11 +11,9 @@ let s = fs.readFileSync(GRADLE, 'utf8');
 const versionCode = process.env.VERSION_CODE || '1';
 let versionName = process.env.VERSION_NAME || '';
 if (!versionName) {
-  try {
-    const html = fs.readFileSync('www/index.html', 'utf8');
-    const m = html.match(/גרסה\s+(\d+\.\d+\.\d+)/);
-    if (m) versionName = m[1];
-  } catch {}
+  // מספור עצמאי לאנדרואיד, מ-package.json. במכוון *לא* נגזר מגרסת התוכן של האתר:
+  // גרסת האתר וגרסת האפליקציה נפרדות ומתפצלות (החלטת דוד, 2026-09-16).
+  try { versionName = JSON.parse(fs.readFileSync('package.json', 'utf8')).version || ''; } catch {}
 }
 versionName = versionName || '1.0.0';
 
