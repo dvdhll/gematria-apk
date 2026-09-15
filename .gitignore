@@ -6,3 +6,9 @@ release-keystore.p12
 release-keystore-password.txt
 *.apk
 _*.png
+
+# Play: bundles + PEPK key-export artifacts (never commit)
+*.aab
+*.zip
+pepk*.jar
+*.pem
